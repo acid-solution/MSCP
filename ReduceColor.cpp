@@ -29,7 +29,6 @@ int main(int argc, char* argv[]){
 	conflict_weight = density / 3;
 
 	localsearch_new(cutoff);
-	//old_localsearch();
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed << endl;
 
     return 0;

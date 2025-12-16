@@ -98,7 +98,7 @@ void build(string file_name) {
 	//best_color_num = adjacency_list.size() - 1;
 
 	//index_vertex_vec.resize(adjacency_list.size());
-	color_choice.resize(vertex_count + 1, vector<long>(COLOR_NUM, 0));
+	color_choice.resize(vertex_count + 1, vector<unsigned short>(COLOR_NUM, 0));
 	color_use_number.resize(vertex_count + 1, 0);
 	tabu.resize(vertex_count + 1, 0);
 	conf.resize(vertex_count + 1, 1);
@@ -107,7 +107,7 @@ void build(string file_name) {
 	local_opt_solution.resize(vertex_count + 1, -1);
 
 	good_node_color.resize( vertex_count + 1, vector<long>(0,0));
-	good_node_color_index.resize(vertex_count + 1, vector<long>(COLOR_NUM + 1, -1));
+	good_node_color_index.resize(vertex_count + 1, vector<unsigned short>(COLOR_NUM + 1, -1));
 
 	//node_color_score.resize(vertex_count + 1, vector<long>(COLOR_NUM, -1));
 	//node_color node_color1;
@@ -126,37 +126,33 @@ void build(string file_name) {
 }
 
 void build_test(string file_name) {
+	//创建文件并打开
 	ifstream in_file(file_name);
 	if (!in_file.is_open()) {
-		cout << "in_file error" << endl;
+		cout <<file_name<< " in_file error" << endl;
 		exit(1);
 	}
 
-	//get vertex_count
 	string line;
-	istringstream is;
+	istringstream is;//读取行内容的流
 	string p, tmp;
 	do {
-		getline(in_file, line);
-		is.clear();
-		is.str(line);
+		getline(in_file, line);//读一行
+		is.clear();//清除上一次的流状态
+		is.str(line);//读出流内容
 		is >> p >> tmp >> vertex_count >> edge_count;
-	} while (p != "p");
+	} while (p != "p");//直到读到标准行
 
-	density = edge_count / vertex_count; 
-	//cout << line << endl;
-	//cout << edge_count <<endl;
+	density = edge_count / vertex_count; //计算图的平均度数
 
-	adjacency_list.resize(vertex_count + 1);
-    temp_adjacency_list.resize(vertex_count + 1);
+	adjacency_list.resize(vertex_count + 1);//存储原始图结构
+    temp_adjacency_list.resize(vertex_count + 1);//存储约简后的图结构
 
 	long v1, v2;
-	if (vertex_count < 2000) while (in_file >> tmp >> v1 >> v2) {
+	if (vertex_count < 2000) while (in_file >> tmp >> v1 >> v2) {//去重
 		if (v1 == v2) continue;
 		v1 = v1 - 1;
 		v2 = v2 - 1;
-		//cout << v1 << " " << v2 << endl;
-		//adjacency_list[v2].push_back(v1);
 		if (connect[v1][v2] == 0){
 			connect[v1][v2] = 1;
 			adjacency_list[v1].push_back(v2);
@@ -168,39 +164,16 @@ void build_test(string file_name) {
 			temp_adjacency_list[v2].push_back(v1);
 		}
 	}
+
 	else while (in_file >> tmp >> v1 >> v2) {
-		v1 = v1 - 1;
+		v1 = v1 - 1;//顶点编号从0开始
 		v2 = v2 - 1;
-		//cout << v1 << " " << v2 << endl;
-		//adjacency_list[v2].push_back(v1);
-		/*
-		if (connect[v1][v2] == 0){
-			connect[v1][v2] = 1;
-			adjacency_list[v1].push_back(v2);
-        	temp_adjacency_list[v1].push_back(v2);
-		}
-		if (connect[v2][v1] == 0){
-			connect[v2][v1] = 1;
-			adjacency_list[v2].push_back(v1);
-			temp_adjacency_list[v2].push_back(v1);
-		}
-		*/
-	adjacency_list[v1].push_back(v2);
+	adjacency_list[v1].push_back(v2);			//邻接表存储图结构
 	adjacency_list[v2].push_back(v1);
 	temp_adjacency_list[v1].push_back(v2);
 	temp_adjacency_list[v2].push_back(v1);
 	}
-	in_file.close();
-
-	/*
-	for (long i=0; i < vertex_count - 1; i++){
-		cout << i << ": ";
-		for (auto v : adjacency_list[i]){
-			cout << v << " ";
-		}
-		cout << endl;
-	}
-	*/
+	in_file.close();//读取完毕关闭文件
 
     indicator.resize(vertex_count + 1, false);
 	color_indicator.resize(vertex_count + 1, 0);
@@ -208,17 +181,15 @@ void build_test(string file_name) {
 	conflict_vertex_in_color.resize(vertex_count + 1);
 	vertex_color.resize(vertex_count + 1, -1);
 	remaining_vertex.init(adjacency_list.size());
-	for (vector<vector<long>>::size_type v = 0; v < adjacency_list.size() - 1; ++v) {
+	for (vector<vector<long>>::size_type v = 0; v < adjacency_list.size() - 1; ++v) {//初始化顶点集合
 		remaining_vertex.push_back(v);
 	}
 	working_vertex.init(adjacency_list.size());
     conflict_node_queue.init(adjacency_list.size());
 	valid_node.init(vertex_count + 1);
 	candidate_degree.resize(adjacency_list.size());
-	//best_color_num = adjacency_list.size() - 1;
 
-	//index_vertex_vec.resize(adjacency_list.size());
-	color_choice.resize(vertex_count + 1, vector<long>(COLOR_NUM, 0));
+	
 	color_use_number.resize(vertex_count + 1, 0);
 	tabu.resize(vertex_count + 1, 0);
 	conf.resize(vertex_count + 1, 1);
@@ -227,22 +198,12 @@ void build_test(string file_name) {
 	local_opt_solution.resize(vertex_count + 1, -1);
 
 	good_node_color.resize( vertex_count + 1, vector<long>(0,0));
-	good_node_color_index.resize(vertex_count + 1, vector<long>(COLOR_NUM + 1, -1));
+	
 
-	//node_color_score.resize(vertex_count + 1, vector<long>(COLOR_NUM, -1));
-	//node_color node_color1;
-	//node_color1.color = -1; node_color1.score = -k_conflict_color * vertex_count ;
-	//Best_node_color.resize(vertex_count + 1, node_color1);
-	//cout << "beginreduc " << (double) (clock() - begin_time) / CLOCKS_PER_SEC << endl;
 	if (vertex_count > 2000) for (auto v : remaining_vertex){
 		if (v != 0)
 		find_clique(v);
 	}
-	//cout << "finishreduc " << (double) (clock() - begin_time) / CLOCKS_PER_SEC << endl;
-	//cout << "remain size" << remaining_vertex.size() << endl;
-	//cout << "remove score " << remove_score << endl;
-	//cout << "remove num: " << remove_num << endl;
-
 }
 
 bool find_clique(long vv){
@@ -431,8 +392,8 @@ void init_color(){
 		color_use_number[color]++;
 	}
 	*/
-	printf("initial color num: %ld\n", max_color + 1);
-	exit(0);
+	//printf("initial color num: %ld\n", max_color + 1);
+	//exit(0);
 	//init color_choice, conflict
 	for (auto v : remaining_vertex){
 		long color_v = vertex_color[v];
@@ -493,8 +454,12 @@ void init_color_test(){
 		vertex_color[v] = color;
 		cost += color;
 		color_use_number[color]++;
-
+	
 	}
+	
+	color_choice.resize(vertex_count + 1, vector<unsigned short>(max_color, 0));
+	good_node_color_index.resize(vertex_count + 1, vector<unsigned short>(max_color + 1, -1));
+
 	//初始化好移动节点
     for (auto v : remaining_vertex){
 		long current_color = vertex_color[v];
@@ -819,8 +784,13 @@ long remove_conflict_new4(){
 		//new_color = current_color + 1 + rand() % (max_color - current_color + 1);
 		new_color = max_color + 1;
 
-		if (new_color >= COLOR_NUM) for (long i = 0; i < COLOR_NUM; i++) {if (color_choice[node][i] == 0) { new_color = i; break; } }
-		if (new_color >= COLOR_NUM) new_color = new_color % COLOR_NUM;
+		if (new_color >= COLOR_NUM) 
+			for (long i = 0; i < COLOR_NUM; i++) {
+				if (color_choice[node][i] == 0) { 
+					new_color = i; break; } }
+
+		if (new_color >= COLOR_NUM) 
+			new_color = new_color % COLOR_NUM;
 		
 		color_node(node, new_color);
 		current_iter++;
@@ -1215,6 +1185,143 @@ void update_best_solution(){
 
 bool color_node(long node, long color){
 
+	node_score[node] = 0;//分数重置
+	for (auto v : temp_adjacency_list[node]){
+		conf[v] = 1;//格局检测
+	}
+	
+
+	long old_conflict = 0;
+	long new_conflict = 0;
+	long old_color = vertex_color[node];
+	cost = cost - old_color + color;
+
+	color_use_number[old_color]--;
+	color_use_number[color]++;
+	
+	//update max_color
+	if (color > max_color) max_color = color;
+	if (old_color == max_color){
+		if (color_use_number[max_color] == 0){
+			for (; max_color >= 0; max_color--){
+				if (color_use_number[max_color] > 0){
+					break;
+				}
+			}
+		}
+	}
+
+	//update info of neighborhood nodes
+	for (auto v : temp_adjacency_list[node]){
+		color_choice[v][old_color]--;
+		color_choice[v][color]++;
+		long current_neighbor_color = vertex_color[v];//这个邻居的当前颜色
+
+		// color在good_node_color[v]中但是由于更新使它冲突增加，不再是候选节点
+		if (good_node_color_index[v][color] != -1){			//如果 v邻居中 
+			if (color_choice[v][color] > color_choice[v][current_neighbor_color]){//重新评估该顶点染
+				long index_color = good_node_color_index[v][color];
+				long end_color = *good_node_color[v].rbegin();		
+
+				good_node_color[v][index_color] = *good_node_color[v].rbegin();
+				good_node_color[v].pop_back();
+				good_node_color_index[v][end_color] = index_color;//v邻居中 染 末尾颜色 的节点 下标更新
+				good_node_color_index[v][color] = -1;
+				//valid node update
+				if (good_node_color[v].empty()) valid_node.remove(v);
+			}
+		}
+		//old_color 不在good_node_color[v]中， 但是更新使它的冲突下降，让它加入到其中。
+		if (good_node_color_index[v][old_color] == -1){		//如果 v邻居中 没有染 旧颜色 的节点
+			if (old_color < current_neighbor_color && color_choice[v][old_color] <= color_choice[v][current_neighbor_color]){
+				good_node_color_index[v][old_color] = good_node_color[v].size();
+				good_node_color[v].push_back(old_color);
+				//valid node update
+				if (good_node_color[v].size() == 1)valid_node.push_back(v);
+			}
+		}
+
+		// old color has conflict with v
+		if (vertex_color[v] == old_color){
+			conflict_vertex_in_color[v]--;
+			if (color_choice[v][old_color] == 0){
+				conflict_node_queue.remove(v);
+			}
+
+			//update good_node_color  
+			for (long index = 0; index < good_node_color[v].size(); index++){
+				long neighbor_c = good_node_color[v][index];
+				if (color_choice[v][neighbor_c] > color_choice[v][current_neighbor_color]){
+					long end_color = *good_node_color[v].rbegin();
+					long index_c = good_node_color_index[v][neighbor_c];
+
+					good_node_color[v][index_c] = *good_node_color[v].rbegin();
+					good_node_color[v].pop_back();
+					good_node_color_index[v][end_color] = index_c;
+					good_node_color_index[v][neighbor_c] = -1;			
+					//update valid node
+					if (good_node_color[v].empty())valid_node.remove(v);
+				}
+			}
+		}
+		//new color has conflict with v
+		if (vertex_color[v] == color){
+			conflict_vertex_in_color[v]++;
+			if (color_choice[v][color] == 1){
+				conflict_node_queue.push_back(v);
+			}
+
+			// update good_node_color 	
+			for (long new_c = 0; new_c < current_neighbor_color; new_c++){
+				if (color_choice[v][new_c] == color_choice[v][current_neighbor_color] && good_node_color_index[v][new_c] == -1){
+					good_node_color_index[v][new_c] = good_node_color[v].size();
+					good_node_color[v].push_back(new_c);
+					//update valid node
+					if (good_node_color[v].size() == 1)valid_node.push_back(v);
+				}
+			}
+		}
+
+		if (vertex_color[v] == old_color){
+			++old_conflict;
+		} 
+		if (vertex_color[v] == color) ++new_conflict;
+	}
+
+	//update good_node_color
+	for(auto c : good_node_color[node]){
+		good_node_color_index[node][c] = -1;
+	}
+	good_node_color[node].clear(); 
+	//cout << "c" << endl;
+	if (valid_node.exist(node))valid_node.remove(node);
+	//cout << "c" << endl;
+	
+	 for (long new_c = 0; new_c < color; new_c++){
+		if (color_choice[node][new_c] <= color_choice[node][color]){
+			good_node_color_index[node][new_c] = good_node_color[node].size();
+			good_node_color[node].push_back(new_c);
+			if (good_node_color[node].size() == 1)valid_node.push_back(node);
+		}
+	}
+
+	//update conflict node queue
+	if (old_conflict == 0 && new_conflict > 0){
+		conflict_node_queue.push_back(node);
+	}
+	if (old_conflict > 0 && new_conflict == 0){
+		conflict_node_queue.remove(node);
+	}
+	
+	conflict_vertex_in_color[node] = new_conflict;
+	edge_conflict = edge_conflict - 2*old_conflict + 2*new_conflict;
+	
+	vertex_color[node] = color;
+	return true;
+}
+
+bool color_node_old(long node, long color){
+
 	//tabu[node] = current_iter + TABU_TIME;
 	//cout << edge_conflict << " ";
 	//update config checking vector
@@ -1374,57 +1481,6 @@ bool verify_solution(){
 		}
 	}
 	return true;
-}
-
-void old_localsearch(){
-	if (conflict_weight == 0) conflict_weight = 1;
-
-	//conflict_weight = 25;
-
-	best_score = vertex_count * vertex_count;
-	long big_pert_num = 0;
-	while (current_iter < max_iter)
-	{
-		//choose_conflict_node();
-		choose_conflict_node_new(choose_conflict_node_bms);
-		//decrease_node_color_new();
-		//remove_conflict(); 
-		remove_conflict_new2(remove_conflict_bms);
-		//cout << "cycle begin 3" << endl;
-		//decrease_color();
-		//decrease_color_new();
-		
-		long score = 0;
-		if (edge_conflict == 0) score = compute_best_score();
-		if (edge_conflict == 0 && score < best_score) {
-			//cout << "score: " << score << endl; 
-			update_best_solution();
-			if (!verify_solution()){
-				cout << "solution error" << endl;
-				getchar();
-			}
-			//cout << "best score: " << best_score << " " << current_iter << " " << no_impr << endl;
-			no_impr = 0;
-			big_pert_node_num = vertex_count / big_pertub_num_k;
-			//cout << "color use num";
-			//big_pert_node_num = 5;
-			for (long c = 0; c <= max_color; c++){
-				//cout << color_use_number[c] << " ";
-			}
-			//cout <<endl;
-		}
-		//if (no_impr > 10000000){
-		if (no_impr > max_no_impr){
-			big_pertub(big_pert_node_num,big_pertub_bms,conflict_weight);
-			//if (max_no_impr < max_no_impr_basic * 1000) max_no_impr = max_no_impr * max_no_impr_increase_coefficient;
-			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //using luby restart
-			//cout << "big pertub" << max_no_impr << endl;
-			no_impr = 0;
-			big_pert_num++;
-		}
-		perturbation(pertub_bms, conflict_weight);
-		
-	}	
 }
 
 void localsearch_new(int cutoff){
