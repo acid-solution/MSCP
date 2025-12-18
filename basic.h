@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "util.h"
+
 #define COLOR_NUM 1000
 #define TABU_TIME 3
 
@@ -24,11 +26,10 @@ long choose_conflict_node();
 void swap_two_color(long color1, long color2);
 bool find_clique(long v);
 
-static double luby(double y, int x);
 
 vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
 vector<vector<long>> temp_adjacency_list;//存储约简后的图结构
-vector<vector<unsigned short>> color_choice;	//color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
+vector<vector<short>> color_choice;	//color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
 vector<long> tabu;
 
 vector<bool> indicator; // set it false after using
@@ -46,7 +47,7 @@ vector<long> best_solution;
 vector<long> local_opt_solution;
 
 vector<vector<long>> good_node_color; //对于每个节点 v，good_node_color[v] 维护了一个候选颜色列表。这个列表里的颜色通常是“好移动”的目标颜色
-vector<vector<unsigned short>> good_node_color_index; //good_node_color_index[v][c] 记录了颜色 c 在 good_node_color[v] 这个 vector 中的下标位置
+vector<vector<short>> good_node_color_index; //good_node_color_index[v][c] 记录了颜色 c 在 good_node_color[v] 这个 vector 中的下标位置
 
 long colored_vertex_num = 0; //the number of vertex colored of all graph
 long max_color = 0;
@@ -143,3 +144,7 @@ Vertex_vec_with_index remaining_vertex;
 Vertex_vec_with_index working_vertex;
 Vertex_vec_with_index conflict_node_queue;
 Vertex_vec_with_index valid_node;
+
+
+
+long max_size = 0;
