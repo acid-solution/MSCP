@@ -12,6 +12,7 @@
 #include "util.h"
 
 #define COLOR_NUM 1000
+
 #define TABU_TIME 3
 
 using namespace std;

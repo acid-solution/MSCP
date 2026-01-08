@@ -1,2 +1,6 @@
+#ReduceColor: ReduceColor.cpp ReduceColor.h basic.h util.h
+#	g++ ReduceColor.cpp -O3 -std=c++11 -o ReduceColor
+
+
 ReduceColor: ReduceColor.cpp ReduceColor.h basic.h util.h
-	g++ ReduceColor.cpp -O3 -std=c++11 -o ReduceColor
+	g++ ReduceColor.cpp -fsanitize=address -g -O3 -std=c++11 -o ReduceColor
