@@ -33,9 +33,9 @@ vector<vector<long>> temp_adjacency_list;//存储约简后的图结构
 vector<vector<short>> color_choice;	//color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
 vector<long> tabu;
 
-vector<bool> indicator; // set it false after using
-vector<long> color_indicator; // set it 0 after using
-vector<long> remove_indicator; // set it true after this node is choosen and remove
+vector<bool> indicator; //在 find_clique 中使用，用于O(1)查询
+vector<long> color_indicator; //没用到
+vector<long> remove_indicator; //在 find_clique 中使用，标记节点是否被移除
 vector<long> candidate_degree;
 vector<vector<long>> all_clique;
 vector<long> node_score;
@@ -43,15 +43,14 @@ vector<long> conf;
 vector<long> vertex_color;// vertex_color[v] 是节点 v 的颜色编号
 vector<long> color_use_number; //color_use_number[c] 是颜色 c 被使用的节点数量
 vector<long> conflict_vertex_in_color; //all the conflict node
-//vector<long> layer_vertex; // vertex in each layer
 vector<long> best_solution;
 vector<long> local_opt_solution;
 
 vector<vector<long>> good_node_color; //对于每个节点 v，good_node_color[v] 维护了一个候选颜色列表。这个列表里的颜色通常是“好移动”的目标颜色
-vector<vector<short>> good_node_color_index; //good_node_color_index[v][c] 记录了颜色 c 在 good_node_color[v] 这个 vector 中的下标位置
+vector<vector<short>> good_node_color_index; //在color_node函数中使用，用于O(1)查询，已删除
 
 long colored_vertex_num = 0; //the number of vertex colored of all graph
-long max_color = 0;
+long max_color = -1;
 long edge_conflict = 0;
 long layer_edge_conflict; //edge conflict for each layer
 long current_iter = 0;
@@ -64,7 +63,7 @@ double final_time;
 unsigned long bms_count;
 long vertex_count;
 long edge_count;
-long cost;//当前解的花费
+long cost = 0;//当前解的花费
 long remove_score;
 long remove_num;
 long density;

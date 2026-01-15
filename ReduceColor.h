@@ -57,7 +57,7 @@ void read_file(string file_name){
 	in_file.close();
 }
 
-void build() {
+void build(){
     indicator.resize(vertex_count + 1, false);
 	color_indicator.resize(vertex_count + 1, 0);
 	remove_indicator.resize(vertex_count + 1, false);
@@ -71,7 +71,7 @@ void build() {
 	best_solution.resize(vertex_count + 1, -1);
 	local_opt_solution.resize(vertex_count + 1, -1);
 	good_node_color.resize( vertex_count + 1, vector<long>(0,0));
-						cout << "build done 1" << endl;
+						//cout << "build done 1" << endl;
 
 	remaining_vertex.init(adjacency_list.size());//初始化剩余节点
 	for (vector<vector<long>>::size_type v = 0; v < adjacency_list.size() - 1; ++v) {	//将所有节点加入剩余节点列表
@@ -80,7 +80,7 @@ void build() {
 	working_vertex.init(adjacency_list.size());		//初始化工作节点列表
     conflict_node_queue.init(adjacency_list.size());//初始化冲突节点队列
 	valid_node.init(vertex_count + 1);				//初始化有效节点列表
-						cout << "build done 2" << endl;
+						//cout << "build done 2" << endl;
 
 	color_choice.resize(vertex_count + 1);
 	for(auto v : remaining_vertex){
@@ -96,155 +96,145 @@ void build() {
 		}
 			color_choice[v].resize(max_deg + 1, 0);
 	}
-						cout << "build done 3" << endl;
+						//cout << "build done 3" << endl;
 	//color_choice.resize(vertex_count + 1, vector<short>(COLOR_NUM+1, 0));
     //good_node_color_index.resize(vertex_count + 1, vector<short>(COLOR_NUM+1, -1));
 	
 						
 
 						//exit(0);
-	if (vertex_count > 2000) for (auto v : remaining_vertex){
-		if (v != 0);
-		//find_clique(v);
+	if (vertex_count > 2000) 
+	for (auto v : remaining_vertex){//从每个点开始寻找团
+		if (v != 0)
+		find_clique(v);
 	}
 }
 
 bool find_clique(long vv){
 
-    //long add_v = rand() % remaining_vertex.size();
- 	//while (remove_indicator[add_v] == true) add_v = rand() % remaining_vertex.size();
-	//if (vv == 0) return false;
-	long add_v = vv;
-	if (remove_indicator[add_v] == true) return false;
-	if (temp_adjacency_list[add_v].size() > density) return false;
-	if (temp_adjacency_list[add_v].size() == 0){
-		remove_indicator[add_v] = true;
-		//cout << "valid " ;
-		//cout << add_v << endl;
-		remove_score += 1;
-		remaining_vertex.remove(add_v);
-		remove_num++;
+	long add_v = vv;		//从add_v也就是vv开始寻找团
+	if (remove_indicator[add_v] == true) return false;				//节点已经被移除，直接返回
+	if (temp_adjacency_list[add_v].size() > density) return false;	//节点度数过大，跳过
+
+	if (temp_adjacency_list[add_v].size() == 0){	//孤立节点，直接移除
+		remove_indicator[add_v] = true;	//删除标记
+		remove_score += 1;				//得分
+		remaining_vertex.remove(add_v);	//剩余节点
+		remove_num++;					//移除数量
 		return true;
 	}
 
-    vector<long> candidate;
-    vector<long> clique;
-    clique.push_back(add_v);
+    vector<long> candidate;		//候选节点列表
+    vector<long> clique;		//找到的团
+    clique.push_back(add_v);	//将起始节点加入团
 
-    for (auto u : temp_adjacency_list[add_v]){
-		if (remove_indicator[u] == true) continue;
-        candidate.push_back(u);
-        candidate_degree[u] = 0;
-        indicator[u] = true;
+    for (auto u : temp_adjacency_list[add_v]){		//把所有邻居节点(除了被移除的点）加入候选集
+		if (remove_indicator[u] == true) continue;	//跳过已经被移除的节点
+        candidate.push_back(u);		//邻居节点加入候选集
+        candidate_degree[u] = 0;	//初始化候选集的度数为0
+        indicator[u] = true;		//标记u在候选集中，方便O(1)判断
     }
 
-	for (auto u : candidate) {
+	for (auto u : candidate) {		//计算在候选集中的每个节点的度数
 		for (auto w : temp_adjacency_list[u]) {
-			if (indicator[w] == true) {
+			if (indicator[w] == true) {		//利用标记快速判断邻居w是否在候选集中
 				candidate_degree[u]++;
 			}
 		}
 	}
-
-	for (auto u : temp_adjacency_list[add_v]) {
+	for (auto u : temp_adjacency_list[add_v]) {	//重置标记
 		indicator[u] = false;
 	}
-    while (!candidate.empty()){
-		if (candidate.size() <= bms_count) {
+
+    while (!candidate.empty()){		//扩展团
+		if (candidate.size() <= bms_count) {	//候选集较小时，选择度数最大的节点加入团
 			add_v = candidate[0];
-			for (vector<long>::size_type i = 1; i < candidate.size(); ++i) {
+			for (vector<long>::size_type i = 1; i < candidate.size(); ++i) {//遍历候选集
 				long v = candidate[i];
-				if (candidate_degree[v] > candidate_degree[add_v]) {
+				if (candidate_degree[v] > candidate_degree[add_v]) {//选择度数最大的节点
 					add_v = v;
 				}
 			}
 		}
-		else {
-			add_v = candidate[rand() % candidate.size()];
-			for (unsigned long i = 1; i < bms_count; ++i) {
-				long v = candidate[rand() % candidate.size()];
-				if (candidate_degree[v] > candidate_degree[add_v]) {
+		else {									//候选集较大时，使用BMS策略选择节点加入团
+			add_v = candidate[rand() % candidate.size()];				//随机选择一个节点作为初始节点
+			for (unsigned long i = 1; i < bms_count; ++i) {				//进行bms_count次随机选择
+				long v = candidate[rand() % candidate.size()];			//随机选择一个节点
+				if (candidate_degree[v] > candidate_degree[add_v]) {//选择度数最大的节点	
 					add_v = v;
 				}
 			}
 		}
 
-        for (auto v : candidate) {
+        for (auto v : candidate) {	//在候选集里
 			indicator[v] = true;
 		}
-		for (auto v : temp_adjacency_list[add_v]) {
+		for (auto v : temp_adjacency_list[add_v]) { //add_v现在是将要加入团的节点，得是他的邻居
 			indicator[v] = false;
 		}
-        for (vector<long>::size_type i = 0; i < candidate.size();){
-            if (indicator[candidate[i]] == true){
+        for (vector<long>::size_type i = 0; i < candidate.size();){	
+            if (indicator[candidate[i]] == true){//candidate[i]在候选集里但不是add_v的邻居
                 indicator[candidate[i]] = false;
-                for (auto u : temp_adjacency_list[candidate[i]]){
-                    candidate_degree[u]--;
+                for (auto u : temp_adjacency_list[candidate[i]]){	//candidate[i]的所有邻居u的度数减1？？？会不会有没在candidate里的节点？
+                    candidate_degree[u]--;		
                 }
-                candidate[i] = *candidate.rbegin();
-                candidate.pop_back();
+                candidate[i] = *candidate.rbegin();		//用最后一个节点覆盖当前位置
+                candidate.pop_back();					//删除最后一个节点
             }
             else {
                 i++;
             }
         }
-        clique.push_back(add_v);
+        clique.push_back(add_v);//将add_v加入团
     }
+
 	vector<long> edge_out;
-	for (auto v : clique){
-		long node_edge_out = adjacency_list[v].size() - clique.size() + 1;
-		edge_out.push_back(node_edge_out);
+	for (auto v : clique){	//计算团内每个节点的出边数
+		long node_edge_out = adjacency_list[v].size() - clique.size() + 1;//计算节点v的出边数=总度数-团内度数
+		edge_out.push_back(node_edge_out);	//记录每个节点的出边数
 	}
 
 	long edge_out_sum = 0;
-	sort(edge_out.begin(), edge_out.end(), cmp_by_edgeout);
+	sort(edge_out.begin(), edge_out.end(), cmp_by_edgeout);	//按出边数降序排序
 	long i = 1;
 	long clique_size = clique.size();
 	bool valid_flag = true;
-	for (auto v : edge_out){
-		if (v > clique_size - i) {
-			valid_flag = false;
-			//break;
+	for (auto v : edge_out){	//每个节点的出边数
+		if (v > clique_size - i) {	//阶梯状的规则
+			valid_flag = false;		
 		}
 		++i;
-		edge_out_sum += v;
+		edge_out_sum += v;	//计算出边数总和
 	}
- 	//cout << "clique size:" << clique_size << "EdgeOut:" << edge_out_sum << endl;
 
-     //record all the clique
- 	if (valid_flag){
- 		//all_clique.push_back(clique);
- 		//cout << "valid_clique ";
+ 	if (valid_flag){	//满足移除条件，移除该团内所有节点
 		long i = 1;
  		for (auto v : clique){
- 			remove_indicator[v] = true;
-			//remaining_vertex.remove(v);
- 			//cout << v << " ";
-			remove_clique(v);
-			remove_num++;
-			remove_score += i;
-			i++;
+ 			remove_indicator[v] = true;	//维护删除标记
+			remove_clique(v);	//移除顶点
+			remove_num++;		//维护移除数量
+			remove_score += i;	//维护移除得分
+			i++;		
  		}
- 		//cout << endl;
  	}
 
      return true;
 
 }
 
-bool remove_clique(long v){
-	vector<long> &clique = *all_clique.rbegin();
+bool remove_clique(long v){//删除节点 v 和其相关边
+	//vector<long> &clique = *all_clique.rbegin();
 
-        for(auto u : temp_adjacency_list[v]){
+        for(auto u : temp_adjacency_list[v]){	//删除节点v在temp_adjacency_list中所有邻居节点u与v的连接
 			for (vector<long>::size_type i = 0; i < temp_adjacency_list[u].size(); ++i) {
-				if (temp_adjacency_list[u][i] == v) {
-					temp_adjacency_list[u][i] = *temp_adjacency_list[u].rbegin();
-					temp_adjacency_list[u].pop_back();
+				if (temp_adjacency_list[u][i] == v) {								//找到邻居节点 u 的邻接表中与 v 相连的边
+					temp_adjacency_list[u][i] = *temp_adjacency_list[u].rbegin();	//将该边与邻接表的最后一条边交换
+					temp_adjacency_list[u].pop_back();								//删除邻接表的最后一条边
 					break;
 				}
 			}
         }
-        remaining_vertex.remove(v);
+        remaining_vertex.remove(v);//从剩余节点列表中移除节点 v
     return true;
 }
 
@@ -255,8 +245,7 @@ void init_color(){
 	if (remainnign_size < color_threshold) color_threshold = remainnign_size;//调整最大颜色数目，避免颜色数目过大
 
 	//new init color function 
-	/**/
-	for (auto v : remaining_vertex){
+	for (auto v : remaining_vertex){//给每个节点分配颜色
 		vector<long> neig_color;
 		neig_color.resize(color_threshold,0);//初始化邻居颜色记录数组
 		for (auto u : adjacency_list[v]){	//遍历节点 v 的所有邻居 u
@@ -283,7 +272,7 @@ void init_color(){
 		color_use_number[color]++;					//维护颜色使用数量	
 	}
 
-	for (auto v : remaining_vertex){					
+	for (auto v : remaining_vertex){//初始化 color_choice 矩阵和冲突信息					
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
 			color_choice[u][color_v]++;				//更新邻居 u 对应颜色 color_v 的选择计数
@@ -294,7 +283,8 @@ void init_color(){
 			}
 		}
 	}
-    for (auto v : remaining_vertex){				
+
+    for (auto v : remaining_vertex){//初始化冲突节点队列和 good_node_color 数组				
         if (conflict_vertex_in_color[v] > 0){		//如果节点 v 存在冲突
             conflict_node_queue.push_back(v);		//将节点 v 添加到冲突节点队列中
         }
@@ -310,7 +300,7 @@ void init_color(){
     }
 
 	// init good_node_color
-	for (auto n : remaining_vertex){			
+	for (auto n : remaining_vertex){//初始化有效节点列表	
 		if (good_node_color[n].size() > 0){		//如果节点 n 存在好颜色
 			valid_node.push_back(n);			//将节点 n 添加到有效节点列表中
 		}
@@ -318,42 +308,63 @@ void init_color(){
 
 }
 
-void init_color_new(){
-	//init vertex with random color
-	long remainnign_size = remaining_vertex.size();
-	long color_threshold = COLOR_NUM;
-	if (remainnign_size < color_threshold) color_threshold = remainnign_size;//调整最大颜色数目，避免颜色数目过大
+void init_color_mis() {
 
-	//new init color function 
-	/**/
-	for (auto v : remaining_vertex){
-		vector<long> neig_color;
-		neig_color.resize(color_threshold,0);//初始化邻居颜色记录数组
-		for (auto u : adjacency_list[v]){	//遍历节点 v 的所有邻居 u
-			if (vertex_color[u] != -1){		//如果邻居 u 已经被染色
-				neig_color[vertex_color[u]] = 1;	//将该颜色标记为已被使用
-			}
-		}
+    vector<long> sorted_nodes; 
+    sorted_nodes.clear();
+    sorted_nodes.reserve(remaining_vertex.size());
+    for (auto v : remaining_vertex) {
+        sorted_nodes.push_back(v);
+    }
 
-		long color = -1;
-		for (long i = 0; i < color_threshold; i++){	//寻找第一个未被使用的颜色
-			if (neig_color[i] == 0) {
-				color = i;
-				break;
-			}
-		}
-		if(color == -1){
-			printf("error init color!!!!!!!!\n");
-			exit(0);
-		}
+    // 排序：度数从小到大
+    sort(sorted_nodes.begin(), sorted_nodes.end(), [&](long a, long b) {
+        if (temp_adjacency_list[a].size() != temp_adjacency_list[b].size())
+            return temp_adjacency_list[a].size() < temp_adjacency_list[b].size();	
+        return a < b;
+    });
 
-		if (color > max_color) max_color = color;	//更新最大颜色编号
-		vertex_color[v] = color;					//为节点 v 分配颜色
-		cost += color;								//更新当前解的花费
-		color_use_number[color]++;					//维护颜色使用数量	
-	}
+    // 禁忌数组
+    vector<short> forbidden_color_id; 
+    forbidden_color_id.resize(adjacency_list.size() + 1, -1);
 
-	for (auto v : remaining_vertex){					
+    long current_color = 0;// 当前正在使用的颜色编号，从0号颜色开始
+    long colored_count = 0;// 已经染色的节点数量
+    long total_nodes = sorted_nodes.size();
+
+    //极大独立集染色
+    while (colored_count < total_nodes) {
+        bool used_this_color = false;
+
+        for (auto v : sorted_nodes) {
+            // 已染色跳过
+            if (vertex_color[v] != -1) continue;
+            // 如果 v 被标记为当前颜色禁忌，说明它的某个邻居已经染了 current_color
+            if (forbidden_color_id[v] == current_color) continue; 
+
+            //因为按颜色一层一层染色，所以只有同一层的颜色会冲突，之前层的颜色不会冲突
+            // --- 能够走到这里，说明 v 是安全的 ---
+            
+            vertex_color[v] = current_color;// 为节点 v 分配颜色
+            colored_count++;
+
+            if (!used_this_color) {	// 如果该颜色第一次被使用
+                if (current_color > max_color) max_color = current_color;//更新最大颜色编号
+                used_this_color = true;
+            }
+            cost += current_color;	//更新当前解的花费
+            color_use_number[current_color]++;	//维护颜色使用数量
+
+            // 主动封锁邻居，既然 v 用了 current_color，那么 v 的所有邻居在这一轮都不能用了
+            for (auto u : temp_adjacency_list[v]) {
+                forbidden_color_id[u] = current_color;	//封锁邻居u
+            }
+        }
+
+        current_color++;
+    }
+
+	for (auto v : remaining_vertex){//初始化 color_choice 矩阵和冲突信息					
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
 			color_choice[u][color_v]++;				//更新邻居 u 对应颜色 color_v 的选择计数
@@ -364,7 +375,8 @@ void init_color_new(){
 			}
 		}
 	}
-    for (auto v : remaining_vertex){				
+
+    for (auto v : remaining_vertex){//初始化冲突节点队列和 good_node_color 数组				
         if (conflict_vertex_in_color[v] > 0){		//如果节点 v 存在冲突
             conflict_node_queue.push_back(v);		//将节点 v 添加到冲突节点队列中
         }
@@ -379,13 +391,11 @@ void init_color_new(){
 		}
     }
 
-	// init good_node_color
-	for (auto n : remaining_vertex){			
+	for (auto n : remaining_vertex){//初始化有效节点列表	
 		if (good_node_color[n].size() > 0){		//如果节点 n 存在好颜色
 			valid_node.push_back(n);			//将节点 n 添加到有效节点列表中
 		}
 	}
-
 }
 
 long choose_conflict_node(){

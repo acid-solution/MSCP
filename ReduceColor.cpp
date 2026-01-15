@@ -8,23 +8,32 @@ int main(int argc, char* argv[]){
 	srand(seed);
 	file_name = argv[1];
 
-	cout<<file_name<<endl;
+	//cout<<file_name<<endl;
 
 	read_file(file_name);
-	cout << "read file done" << endl;
+	//cout << "read file done" << endl;
 
 	begin_time = clock(); 
     build();
-	cout << "build done" << endl;
+	//cout << "build done" << endl;
 	
-	init_color(); 
-	cout << "init color done" << endl;
+	clock_t init_time_start = clock();
+	//init_color();
+	init_color_mis(); 
+	clock_t init_time_end = clock();
+
+	double duration_seconds = (double)(init_time_end - init_time_start) / CLOCKS_PER_SEC;
+	cout<<file_name<<" "<<cost<<" "<<max_color<<" "<<duration_seconds<<endl;
+
+	exit(0);
+	//cout << "init color done" << endl;
 
 	if (vertex_count > 100000){
 		bms = 10;
 		choose_conflict_node_bms = bms;
 	 	pertub_bms = bms;
 		remove_conflict_bms = bms;
+		bms_count = bms;
 	}
 	conflict_weight = density / 3;
 
