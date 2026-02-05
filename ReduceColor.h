@@ -98,15 +98,16 @@ void build(){
 	}
 						//cout << "build done 3" << endl;
 	//color_choice.resize(vertex_count + 1, vector<short>(COLOR_NUM+1, 0));
+
     //good_node_color_index.resize(vertex_count + 1, vector<short>(COLOR_NUM+1, -1));
 	
 						
 
 						//exit(0);
-	if (vertex_count > 2000) 
+	if (vertex_count > 2000) //顶点大于2000时才进行约简
 	for (auto v : remaining_vertex){//从每个点开始寻找团
-		if (v != 0)
-		find_clique(v);
+		//if (v != 0)
+		//find_clique(v);
 	}
 }
 
@@ -275,6 +276,11 @@ void init_color(){
 	for (auto v : remaining_vertex){//初始化 color_choice 矩阵和冲突信息					
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
+
+			if (color_v >= color_choice[u].size()) {
+                color_choice[u].resize(color_v + 1, 0);
+            }
+
 			color_choice[u][color_v]++;				//更新邻居 u 对应颜色 color_v 的选择计数
 
 			if (vertex_color[u] == vertex_color[v]){	//如果邻居 u 与节点 v 颜色相同，表示冲突
@@ -306,67 +312,76 @@ void init_color(){
 		}
 	}
 
+	update_best_solution();
+	if(!verify_solution()) {
+		cout << "error init_color" << endl;
+		exit(0);
+	}
+
 }
 
-void init_color_mis() {
+void init_color_mis(){
 
-    vector<long> sorted_nodes; 
+    vector<long> sorted_nodes; //方便排序的数组
     sorted_nodes.clear();
     sorted_nodes.reserve(remaining_vertex.size());
     for (auto v : remaining_vertex) {
         sorted_nodes.push_back(v);
     }
 
-    // 排序：度数从小到大
+    //排序：度数从小到大
     sort(sorted_nodes.begin(), sorted_nodes.end(), [&](long a, long b) {
         if (temp_adjacency_list[a].size() != temp_adjacency_list[b].size())
             return temp_adjacency_list[a].size() < temp_adjacency_list[b].size();	
         return a < b;
     });
 
-    // 禁忌数组
+    //禁忌数组
     vector<short> forbidden_color_id; 
     forbidden_color_id.resize(adjacency_list.size() + 1, -1);
 
-    long current_color = 0;// 当前正在使用的颜色编号，从0号颜色开始
-    long colored_count = 0;// 已经染色的节点数量
+    long current_color = 0;//当前正在使用的颜色编号，从0号颜色开始
+    long colored_count = 0;//已经染色的节点数量
     long total_nodes = sorted_nodes.size();
 
-    //极大独立集染色
+    //类似ksell和独立集染色
     while (colored_count < total_nodes) {
         bool used_this_color = false;
 
         for (auto v : sorted_nodes) {
-            // 已染色跳过
+            //已染色跳过
             if (vertex_color[v] != -1) continue;
-            // 如果 v 被标记为当前颜色禁忌，说明它的某个邻居已经染了 current_color
+            //如果 v 被标记为当前颜色禁忌，说明它的某个邻居已经染了 current_color
             if (forbidden_color_id[v] == current_color) continue; 
 
             //因为按颜色一层一层染色，所以只有同一层的颜色会冲突，之前层的颜色不会冲突
-            // --- 能够走到这里，说明 v 是安全的 ---
             
-            vertex_color[v] = current_color;// 为节点 v 分配颜色
+            vertex_color[v] = current_color;//为节点v分配颜色
             colored_count++;
 
-            if (!used_this_color) {	// 如果该颜色第一次被使用
+            if (!used_this_color) {	//如果该颜色第一次被使用
                 if (current_color > max_color) max_color = current_color;//更新最大颜色编号
                 used_this_color = true;
             }
             cost += current_color;	//更新当前解的花费
             color_use_number[current_color]++;	//维护颜色使用数量
 
-            // 主动封锁邻居，既然 v 用了 current_color，那么 v 的所有邻居在这一轮都不能用了
+            //主动封锁邻居，既然 v 用了 current_color，那么 v 的所有邻居在这一轮都不能用了
             for (auto u : temp_adjacency_list[v]) {
                 forbidden_color_id[u] = current_color;	//封锁邻居u
             }
         }
-
         current_color++;
     }
 
 	for (auto v : remaining_vertex){//初始化 color_choice 矩阵和冲突信息					
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
+
+			if (color_v >= color_choice[u].size()) {
+                color_choice[u].resize(color_v + 1, 0);
+            }
+
 			color_choice[u][color_v]++;				//更新邻居 u 对应颜色 color_v 的选择计数
 
 			if (vertex_color[u] == vertex_color[v]){	//如果邻居 u 与节点 v 颜色相同，表示冲突
@@ -396,6 +411,13 @@ void init_color_mis() {
 			valid_node.push_back(n);			//将节点 n 添加到有效节点列表中
 		}
 	}
+
+	update_best_solution();
+	if(!verify_solution()) {
+		cout << "error init_color_mis" << endl;
+		exit(0);
+	}
+
 }
 
 long choose_conflict_node(){
@@ -407,10 +429,6 @@ long choose_conflict_node(){
 		
 		no_impr++;
 		iter++;
-		// #liyan debug
- #ifndef NDEBUG
-		//cout << "conflict queue size: " << conflict_node_queue.size() << endl;
- #endif
 		if (conflict_node_queue.empty()) return 0;
 
 		long index = rand() % conflict_node_queue.size();
@@ -501,7 +519,7 @@ void choose_conflict_node_new(long bms){
 	
 }
 
-long choose_good_node(long bms, long& BestNode, long& BestColor){
+long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示找到合适节点，0表示没有
 	//long bms = 100;
 	long iter = 0;
 
@@ -573,7 +591,7 @@ long choose_good_node_new(long bms, long& BestNode, long& BestColor){
 	return 0;
 }
 
-long remove_conflict(){
+long remove_conflict(){//随机贪心去除所有冲突
 
 	long max_iter_rc = vertex_count;
 	long iter_rc = 0;
@@ -607,7 +625,7 @@ long remove_conflict(){
 	return edge_conflict;
 }
 
-long remove_conflict_new2(long bms){
+long remove_conflict_new2(long bms){//随机采样基于评分去除所有冲突
 	long max_iter_rc = vertex_count;
 	long iter_rc = 0;
 	//long bms = 10;
@@ -687,7 +705,7 @@ long remove_conflict_new2(long bms){
 	return edge_conflict;
 }
 
-long remove_conflict_new4(){
+long remove_conflict_new4(){//随机选择冲突节点，染色后tabu锁住
 	if (edge_conflict > 0){
 		long index = rand() % conflict_node_queue.size();
 		long node = conflict_node_queue[index];
@@ -698,7 +716,6 @@ long remove_conflict_new4(){
 
 		if (conf[node] == 0) return 0;
 		if (tabu[node] > current_iter) return 0;
-		//new_color = current_color + 1 + rand() % (max_color - current_color + 1);
 		new_color = max_color + 1;
 
 		if (new_color >= COLOR_NUM) 
@@ -1031,33 +1048,6 @@ void swap_two_color(long color_1, long color_2){
 			color_node(v, color_1);
 		}
 	}
-}
-
-void sort_color(){
-		
-	//cout << "color use num" << endl;
-	for (long i = 0; i <= max_color; i++){
-		//cout << color_use_number[i] << " ";
-		if (i == 0)continue;
-		long j = i;
-		if (color_use_number[i] > color_use_number[i-1]){
-			for (; j > 0; j--){
-				if (color_use_number[j] >= color_use_number[j - 1]) swap_two_color(j, j-1);
-			}
-		}
-	}
-	//cout << endl;
-
-	//cout << "color use number after swap " << endl;
-	for (long i = 0; i <= max_color; i++){
-		long sum = 0;
-		for (auto v : remaining_vertex){
-			if (vertex_color[v] == i)sum++;
-		}
-		//cout << sum << " ";
-	}
-	//cout << endl;
-	
 }
 
 void update_best_solution(){
@@ -1440,82 +1430,51 @@ bool verify_solution(){
 	return true;
 }
 
-void localsearch_new(int cutoff){
-	if (conflict_weight == 0) conflict_weight = 1;
-	//conflict_weight = 25;
-
-	best_score = vertex_count * vertex_count;
+void localsearch(int cutoff){
+	if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 	long big_pert_num = 0;
-	while (current_iter < max_iter)
+
+	while (current_iter < max_iter)//迭代次数
 	{
 		long best_node = -1;
 		long best_color = -1;
-		long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);
-		if (x == 1 && best_node != -1){//good_var 不为空
-			color_node(best_node,best_color);
+		long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
+		if (x == 1 && best_node != -1){		//如果能找到好的节点，进行贪心
+			color_node(best_node,best_color);//对该节点进行染色
 			current_iter++;
 			no_impr++;
 			tabu[best_node] = current_iter + TABU_TIME;
 		}
 		else{
-			//remove_conflict_new_3(remove_conflict_bms);
-			remove_conflict_new4();
+			remove_conflict_new4();//贪心结束，进行冲突移除
 		}
-		//cout << edge_conflict << " " << max_color << endl;
-		//remove_conflict_new2(remove_conflict_bms);
-		//cout << "cycle begin 3" << endl;
-		//decrease_color();
-		//decrease_color_new();
 		
 		long score = 0;
-		if (edge_conflict == 0) score = compute_best_score();
-		//if (edge_conflict == 0) score = compute_score();
-		//cout << score << endl;
-
+		if (edge_conflict == 0) score = compute_best_score();//如果没有冲突，就计算分数，计算时间
 		best_time = clock();
 		double run_time;
 		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
-
-		if (run_time > cutoff) return ;
-
-		if (edge_conflict == 0 && score < best_score) {
-			//cout << "score: " << score << endl;
-			//cout << score << endl;
-			//for (auto i : remaining_vertex) cout << i << " ";
-			//cout << endl;
-			//for (int i = 0; i < adjacency_list.size(); i++) cout << color_choice[i][vertex_color[i]] << " ";
-			//cout << endl;
-			//for (int i = 0; i < adjacency_list.size(); i++) cout << i << ":" << vertex_color[i] << " ";
-			update_best_solution();
-			if (!verify_solution()){
+		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解
+			update_best_solution();//更新最优解
+			if (!verify_solution()){//验证解的正确性
 				cout << "solution error" << endl;
 				getchar();
 			}
-			//cout << score << "  "  << best_score << "  " << remove_score << endl;
-
-			//cout << "best score: " << best_score + remove_score << " " << current_iter << " " << no_impr << " " << run_time << endl;
-			final_time = run_time;
+			final_time = run_time;//记录最终时间
 			no_impr = 0;
-			big_pert_node_num = vertex_count / big_pertub_num_k;
-			if (big_pert_node_num > 500) big_pert_node_num = 500;
-			
-			//cout << "color use num";
-			//big_pert_node_num = 5;
-			for (long c = 0; c <= max_color; c++){
-				//cout << color_use_number[c] << " ";
-			}
-			//cout <<endl;
+			big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
+			if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500	
 		}
+
 		if (run_time > cutoff) return;
 
-		if (vertex_count < 100000 && no_impr > max_no_impr){
+		if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
 			big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
-			//if (max_no_impr < max_no_impr_basic * 10) max_no_impr = max_no_impr * max_no_impr_increase_coefficient;
-			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //using luby restart
+			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
 			no_impr = 0;
 			big_pert_num++;
 		}
-		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);
+		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
 
 	}
 }

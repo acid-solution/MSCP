@@ -26,6 +26,8 @@ void init_color();
 long choose_conflict_node();
 void swap_two_color(long color1, long color2);
 bool find_clique(long v);
+void update_best_solution();
+bool verify_solution();
 
 
 vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
@@ -82,6 +84,11 @@ long remove_conflict_bms = bms;
 long pertub_bms = bms;
 long big_pertub_bms = bms;
 long max_no_impr = max_no_impr_basic;
+
+
+int reduction_num = 0;
+int unlock_propagate_edge_num = edge_count;
+int unlock_propagate_ver_num = vertex_count;
 
 class Vertex_vec_with_index {
 public:
