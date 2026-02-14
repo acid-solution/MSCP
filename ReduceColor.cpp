@@ -8,23 +8,17 @@ int main(int argc, char* argv[]){
 	srand(seed);
 	file_name = argv[1];
 
-	//cout<<file_name<<endl;
-	 
+	cout<<file_name<<endl;
+	begin_time = clock();
 	read_file(file_name);
-	//cout << "read file done" << endl;
-
+	cout << "read file done" << endl;
 	
     build();
-	//cout << "build done" << endl;
+	cout << "build done" << endl;
 	
-	begin_time = clock();
-	init_color(); 
-	double end_time = clock();
-	final_time = (double)(end_time - begin_time) / CLOCKS_PER_SEC;
-	cout<<file_name<<" "<<compute_best_score()<<" "<<final_time<<" "<<endl; 
-	exit(0);
-
-	//cout << "init color done" << endl;
+	init_color_mis(); 
+	
+	cout << "init color done" << endl;
 
 	if (vertex_count > 100000){
 		bms = 10;
@@ -35,10 +29,8 @@ int main(int argc, char* argv[]){
 	}
 	conflict_weight = density / 3;
 
-	//cout<<"localsearch begin"<<endl;
-	localsearch(cutoff);
-	//cout<<"localsearch done"<<endl;
-
+	cout<<"localsearch begin"<<endl;
+	localsearch_MAB_1(cutoff);
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<endl;
 
     return 0;

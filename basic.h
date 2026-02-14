@@ -68,7 +68,7 @@ long edge_count;
 long cost = 0;//当前解的花费
 long remove_score;
 long remove_num;
-long density;
+double density;
 
 long connect[5000][5000];
 
@@ -78,7 +78,7 @@ long max_iter = 500000000000;
 long max_no_impr_basic = 100000;
 long bms = 90;
 long big_pertub_num_k = 10;
-long conflict_weight;
+double conflict_weight;
 long choose_conflict_node_bms = bms;
 long remove_conflict_bms = bms;
 long pertub_bms = bms;

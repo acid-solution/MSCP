@@ -1,5 +1,6 @@
 #pragma once
 #include "basic.h"
+#include "MABSolver.h"
 
 bool cmp_by_edgeout(long x, long y){
 	return x > y;
@@ -16,19 +17,21 @@ void read_file(string file_name){
 	string line;
 	istringstream is;
 	string p, tmp;
+cout<<"reading file start"<<endl;
 	do {
 		getline(in_file, line);
 		is.clear();
 		is.str(line);
 		is >> p >> tmp >> vertex_count >> edge_count;
 	} while (p != "p");
-
+cout<<"end reading file start"<<endl;
 	density = edge_count / vertex_count; 
 
 	adjacency_list.resize(vertex_count + 1);
     temp_adjacency_list.resize(vertex_count + 1);
 
 	long v1, v2;
+cout<<"begin reading edges"<<endl;
 	if (vertex_count < 2000) while (in_file >> tmp >> v1 >> v2) {
 		if (v1 == v2) continue;
 		v1 = v1 - 1;
@@ -255,16 +258,12 @@ void init_color(){
 			}
 		}
 
-		long color = -1;
+		long color = 0;
 		for (long i = 0; i < color_threshold; i++){	//寻找第一个未被使用的颜色
 			if (neig_color[i] == 0) {
 				color = i;
 				break;
 			}
-		}
-		if(color == -1){
-			printf("error init color!!!!!!!!\n");
-			exit(0);
 		}
 
 		if (color > max_color) max_color = color;	//更新最大颜色编号
@@ -312,7 +311,7 @@ void init_color(){
 		}
 	}
 
-	update_best_solution();
+	best_score = compute_score();
 	if(!verify_solution()) {
 		cout << "error init_color" << endl;
 		exit(0);
@@ -412,7 +411,7 @@ void init_color_mis(){
 		}
 	}
 
-	update_best_solution();
+	best_score = compute_score();
 	if(!verify_solution()) {
 		cout << "error init_color_mis" << endl;
 		exit(0);
@@ -538,43 +537,7 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 			if (tabu[node] > current_iter) continue;
 
 			long current_color = vertex_color[node];
-			long score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
-			// long score = current_color - new_color + k_conflict_color * (color_choice[node][current_color] - color_choice[node][new_color]);
-			//long score = (current_color - new_color) * (color_choice[node][current_color] - color_choice[node][new_color] + 1);
-
-			if (score > best_color_score){
-				best_color_score = score;
-				best_node = node;
-				best_color = new_color;
-			}
-		}
-		BestNode = best_node;
-		BestColor = best_color;
-		return 1;
-	}
-	return 0;
-}
-
-long choose_good_node_new(long bms, long& BestNode, long& BestColor){
-	//long bms = 100;
-	long iter = 0;
-
-	long best_node = -1;
-	long best_color = -1;
-	long best_color_score = -1;
-
-	if (!valid_node.empty()){
-		for (long i = 0; i < bms; i++){
-			//choose a rand node and rand color
-			long index = rand() % valid_node.size();
-			long node = valid_node[index];
-			index = rand() % good_node_color[node].size();
-			long new_color = good_node_color[node][index];
-			if (conf[node] == 0) continue;
-			if (tabu[node] > current_iter) continue;
-
-			long current_color = vertex_color[node];
-			long score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
+			long score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);//打分函数
 			// long score = current_color - new_color + k_conflict_color * (color_choice[node][current_color] - color_choice[node][new_color]);
 			//long score = (current_color - new_color) * (color_choice[node][current_color] - color_choice[node][new_color] + 1);
 
@@ -735,7 +698,7 @@ long remove_conflict_new4(){//随机选择冲突节点，染色后tabu锁住
 	return 1;
 }
 
-long compute_score(){
+long compute_score(){//计算实际染色的分数
 	long sum_score = 0;
 	for (auto v : remaining_vertex){
 		sum_score += vertex_color[v] + 1;
@@ -750,32 +713,16 @@ long compute_score(){
 	return sum_score;
 }
 
-long compute_best_score(){
+long compute_best_score(){//计算交换颜色后的分数
 	long sum = 0;
 	vector<long> color_num;
 	for (long c = 0; c <= max_color; c++){
 		color_num.push_back(color_use_number[c]);
-		//cout << color_use_number[c] << " ";
 	}
 	sort(color_num.rbegin(),color_num.rend());
 	for (long c = 0; c <= max_color; c++){
 		sum = sum + color_num[c] * (c + 1);
-		//cout << color_num[c] * (c+1) << " ";
 	}
-	//cout << sum << endl;
-	//cout << sum << endl;
-	//每次交换两个颜色，逐步使它达到递减排序
-	for (long c = 1; c <= max_color; c++){
-		if (color_use_number[c] > color_use_number[c-1]){
-			swap_two_color(c-1,c);
-			//while(color_use_number[c] > color_use_number[c-1] && c >= 1){
-			//	swap_two_color(c-1,c);
-			//	c--;
-			//}
-			return sum ;
-		}
-	}
-
 	return sum ;
 }
 
@@ -783,121 +730,31 @@ void perturbation(long bms, long conflict_weight){
 
 	long best_node = -1;
 	long best_color = -1;
-	long best_node_old_color = -1;
 	long best_choose_score = -vertex_count;
-	/*
-	long rand_prop = rand() % 100;
-	if(rand_prop < 0){
-		long index = rand() % remaining_vertex.size();
-		long node = remaining_vertex[index];
-		long current_color = vertex_color[node];
-		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;
-		color_node(node,new_color);
-		return;
-	}
-	*/
 
-	for (long i = 0; i < bms; ++i){
-		long index = rand() % remaining_vertex.size();
-		long node = remaining_vertex[index];
-		long current_color = vertex_color[node];
+	for (long i = 0; i < bms; ++i){				//随机采样bms次
+		long index = rand() % remaining_vertex.size();//随机选择一个剩余节点
+		long node = remaining_vertex[index];//获取该节点
+		long current_color = vertex_color[node];//获取该节点的当前颜色
+		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;//随机选择一个比当前颜色大的新颜色
+		long choose_score = (current_color - new_color) ;//计算选择得分，初始为颜色差值的负值
 
-		//#liyan 2 choice
-		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;
-		//if(rand() % 2 == 0) new_color++;
-		//long new_color = rand() % (current_color + 1);
-		long choose_score = (current_color - new_color) ;
-		for (auto v : temp_adjacency_list[node]){
-			/*
-			//basic score function
-			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
-				choose_score++;
-			}
-			if (vertex_color[v] == new_color) choose_score--;
-			*/
 
-			/*
-			//consider color-choice[node][color] == 1 or color_choice[node][color] == 2
-			vector<long> valid_node;
-			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
-				bool flag = true;
-				for (auto u : valid_node){
-					if (connect[v][u] == 1) flag = false;
-				}
-				if (flag == true){
-					choose_score++;
-				}
-			}
-			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
-				bool flag = true;
-				for (auto u : valid_node){
-					if (connect[v][u] == 1) flag = false;
-				}
-				if (flag == true){
-					valid_node.push_back(v);
-					choose_score += 3;
-				}
-			}
-			if (vertex_color[v] == new_color) choose_score -= 3;
-			*/
-			
-			// color_choice and the cost change
-			vector<long> added_node;
-			/**/
-			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
-				bool flag = true;
-				for (auto u : added_node){
-					if (connect[v][u] == 1) flag = false;
-				}
-				if (flag == true){
-					long delta_color = (vertex_color[v] - current_color) / 3;
+		//该节点变成新颜色后，邻居可以换成旧颜色，计算更换后的得分
+		for (auto v : temp_adjacency_list[node]){//遍历该节点的所有邻居节点
+			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){//该邻居除了该节点为旧颜色外，还有其他邻居为旧颜色，但是该邻居的颜色比旧颜色大
+					long delta_color = (vertex_color[v] - current_color) / 3;//有潜力，计算1/3
 					choose_score += delta_color ;
-					//added_node.push_back(v);
-				}
 			}
-			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
-				bool flag = true;
-				for (auto u : added_node){
-					if (connect[v][u] == 1) flag = false;
-				}
-				if (flag == true){
-					long delta_color = (vertex_color[v] - current_color);
+			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){//该邻居只有该节点为旧颜色，且邻居的颜色比旧颜色大
+					long delta_color = (vertex_color[v] - current_color);//绝对能降色，计算全部
 					choose_score += delta_color;
-					//added_node.push_back(v);
-				}
 			}
-			if (vertex_color[v] == new_color) choose_score -= conflict_weight;
-			
-
-			/*
-			vector<long> valid_node;
-			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
-				bool flag = true;
-				for (auto u : valid_node){
-					if (connect[v][u] == 1) flag = false;
-				}
-				if (flag == true){
-					choose_score++;
-				}
-			}
-			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
-				bool flag = true;
-				for (auto u : valid_node){
-					if (connect[v][u] == 1) flag = false;
-				}
-				if (flag == true){
-					valid_node.push_back(v);
-					choose_score += 3;
-				}
-			}
-			if (vertex_color[v] == new_color) choose_score -= 3;
-			*/
-			
+			if (vertex_color[v] == new_color) choose_score -= conflict_weight;//如果该邻居的颜色和新颜色相同，说明会产生冲突，扣分
 		}
-		if (choose_score > best_choose_score){
+		if (choose_score > best_choose_score){//根据得分选择最佳节点和颜色
 			best_node = node;
 			best_color = new_color;
-			best_node_old_color = vertex_color[node];
 			best_choose_score = choose_score;
 		}
 	}
@@ -905,47 +762,6 @@ void perturbation(long bms, long conflict_weight){
 	color_node(best_node, best_color);
 	current_iter++;
 	tabu[best_node] = current_iter + TABU_TIME;
-
-
-
-	long pert_num = 0;
-	for (long i = 0; i < pert_num; i++){
-		long best_node = -1;
-		long best_color = -1;
-		long best_node_old_color = -1;
-		long best_choose_score = -vertex_count;
-		for (long i = 0; i < bms; ++i){
-			long index = rand() % remaining_vertex.size();
-			long node = remaining_vertex[index];
-			long current_color = vertex_color[node];
-			long new_color = rand() % (max_color - current_color + 1) + current_color ;
-			long choose_score = current_color - new_color;
-			for (auto v : temp_adjacency_list[node]){
-				/*
-				if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
-					choose_score++;
-				}
-				*/
-				if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
-					long delta_color = (vertex_color[v] - current_color);
-					choose_score += delta_color / 3;
-				}
-				if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
-					long delta_color = (vertex_color[v] - current_color);
-					choose_score += delta_color;
-				}
-			}
-			if (choose_score > best_choose_score){
-				best_node = node;
-				best_color = new_color;
-				best_node_old_color = vertex_color[node];
-				best_choose_score = choose_score;
-			}
-		}
-		color_node(best_node, best_color);
-		tabu[best_node] = current_iter + TABU_TIME;
-		current_iter++;
-	}
 }
 
 void big_pertub(long pertub_num, long bms, long conflict_weight){
@@ -1051,10 +867,9 @@ void swap_two_color(long color_1, long color_2){
 }
 
 void update_best_solution(){
-	//find the best local optimal, and then update the best solution
 	long sz = remaining_vertex.size();
 	long start_index = rand() % sz;
-	for (long i = 0; i < sz; i++){
+	for (long i = 0; i < sz; i++){//检查所有节点，尝试简单降色
 		long node = (start_index + i) % sz;
 		long current_color = vertex_color[node];
 		long best_color = current_color;
@@ -1064,28 +879,22 @@ void update_best_solution(){
 				break;
 			}
 		}
-		//cout << node << " " << current_color << " ";
-		//cout << vertex_color[0] << " ";
-		
 		if (best_color != current_color) color_node(node, best_color);
 	}
 
-	//update the best solution
-	long score = 0;
-	//score = compute_score();
-	score = compute_best_score();
-	if (score < best_score){
-		best_score = score;
-		for (auto v : remaining_vertex){
-			best_solution[v] = vertex_color[v];
-		}
-	}
-	//sort color
-	for (long i = 1; i <= max_color; i++){
+	for (long i = 1; i <= max_color; i++){//颜色集合整体交换（大而顶点更多的颜色和小的交换）
 		for (long j = i; j < max_color; j++){
 			if (color_use_number[j-1] < color_use_number[j]){
 				swap_two_color(j,j-1);
 			}
+		}
+	}
+
+	long score = compute_score();//计算当前解的评分
+	if (score < best_score){//更新最优解和最优评分
+		best_score = score;//更新最优评分
+		for (auto v : remaining_vertex){
+			best_solution[v] = vertex_color[v];//保存当前解为最优解
 		}
 	}
 }
@@ -1433,6 +1242,8 @@ bool verify_solution(){
 void localsearch(int cutoff){
 	if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 	long big_pert_num = 0;
+	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
+	if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500	
 
 	while (current_iter < max_iter)//迭代次数
 	{
@@ -1462,8 +1273,6 @@ void localsearch(int cutoff){
 			}
 			final_time = run_time;//记录最终时间
 			no_impr = 0;
-			big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
-			if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500	
 		}
 
 		if (run_time > cutoff) return;
@@ -1476,5 +1285,143 @@ void localsearch(int cutoff){
 		}
 		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
 
+	}
+}
+
+void localsearch_MAB_1(int cutoff){
+	if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
+	long big_pert_num = 0;
+	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
+	if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500	
+
+
+	std::vector<double> candidate_alphas = {0.5, 1.0, 3.0, 7.0, 10.0, 20.0}; 
+    MABSolver mab(candidate_alphas);	//初始化MAB老虎机
+
+	int current_arm = mab.select_arm(); // 初始选择
+    double current_alpha_div = mab.get_alpha(current_arm);
+    conflict_weight = (density / current_alpha_div);
+    if (conflict_weight <= 0) cout<<"conflict weight error"<<endl;
+
+	const int HISTORY_SIZE = 20;            // 记录最近20个周期
+    const int CYCLE_LENGTH = vertex_count;          // 每个周期的迭代步数 (可根据图大小调整)
+    int cycle_iter_count = 0;               // 当前周期已执行步数
+
+	// [新增] 引入新的局部地形历史记录 (用 vector 替代旧的两个账本，保持轻量)
+    std::vector<long> recent_scores;
+
+    // 记录当前周期内见过的最好分数（初始化为最大值）
+    long current_cycle_best_score = std::numeric_limits<long>::max();
+
+    cout << "MAB Cyclic Started. Initial Alpha: " << current_alpha_div << endl;
+
+	while (current_iter < max_iter)//迭代次数
+	{
+		long best_node = -1;
+		long best_color = -1;
+		long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
+		if (x == 1 && best_node != -1){		//如果能找到好的节点，进行贪心
+			color_node(best_node,best_color);//对该节点进行染色
+			current_iter++;
+			no_impr++;
+			tabu[best_node] = current_iter + TABU_TIME;
+		}
+		else{
+			remove_conflict_new4();//贪心结束，进行冲突移除
+		}
+		
+		long score = 0;
+		if (edge_conflict == 0) {
+			score = compute_best_score();//如果没有冲突，就计算分数，计算时间
+
+			if (score < current_cycle_best_score) {
+                current_cycle_best_score = score;
+            }
+		}
+		best_time = clock();
+		double run_time;
+		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
+		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解         
+			update_best_solution();//更新最优解
+			if (!verify_solution()){//验证解的正确性
+				cout << "solution error" << endl;
+				getchar();
+			}
+			final_time = run_time;//记录最终时间
+			no_impr = 0;
+		}
+
+		// [新增] MAB 周期结算逻辑 
+        cycle_iter_count++;
+        if (cycle_iter_count >= CYCLE_LENGTH) {
+
+			double reward = 0.0;
+
+			if (current_cycle_best_score < std::numeric_limits<long>::max()) {
+				if (recent_scores.empty()) {
+                    // 历史记录为空（刚开始），既然拿到有效解，给满分鼓励
+                    reward = 1.0; 
+                } else {
+                    // 1. 提取当前局部地形的最差和最好表现
+                    long local_worst = current_cycle_best_score;
+                    long local_best  = current_cycle_best_score;
+                    for (long s : recent_scores) {
+                        if (s > local_worst) local_worst = s;
+                        if (s < local_best)  local_best  = s;
+                    }
+					// 2. 核心评价公式：你在近期的泥潭里排第几？
+                    if (local_worst == local_best) {
+                        // 防御机制：近期分数全部一样（完全卡死）
+                        reward = (current_cycle_best_score < local_best) ? 1.0 : 0.5;
+                    } else {
+                        // 线性插值归一化 (越接近 local_best 分数越高)
+                        reward = (double)(local_worst - current_cycle_best_score) / (local_worst - local_best);
+                    }
+                    
+                    // 3. 双重保险 (防止破纪录导致 > 1.0，或极端情况 < 0.0)
+                    if (reward > 1.0) reward = 1.0;
+                    if (reward < 0.0) reward = 0.0;
+                }
+				// 4. 更新滑动窗口 (踢出最老的，放入最新的)
+                recent_scores.push_back(current_cycle_best_score);
+                if (recent_scores.size() > HISTORY_SIZE) {
+                    recent_scores.erase(recent_scores.begin()); 
+                }
+            } else {
+                // 如果本周期颗粒无收（完全在不可行区域乱转），给 0 分
+                reward = 0.0; 
+            }
+            // 4. 更新 MAB 权重，选择下一个周期的参数
+            mab.update(current_arm, reward);
+             // [修改] 因为删除了 avg_history，稍微调整了终端打印信息，更关注当前得分和拿到的奖励
+            cout << "Cycle End. Alpha: " << current_alpha_div 
+                 << " score: " << current_cycle_best_score 
+                 << " reward: " << reward;
+            current_arm = mab.select_arm();
+            current_alpha_div = mab.get_alpha(current_arm);
+			 cout << " Next Alpha: " << current_alpha_div << endl;   
+            // 6. 应用新参数
+            conflict_weight = (density / current_alpha_div);
+            if (conflict_weight <= 0) conflict_weight = 1;
+            // 7. 重置周期计数器
+            cycle_iter_count = 0;
+            current_cycle_best_score = std::numeric_limits<long>::max();
+        }
+
+
+		if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
+			big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
+			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
+			no_impr = 0;
+			big_pert_num++;
+
+			// [新增] 大扰动会彻底摧毁当前的地形结构！
+            // 必须强制清空本周期的累计数据，防止大扰动造成的“分数变差”让当前的 Alpha 蒙冤背锅。
+            cycle_iter_count = 0;
+            current_cycle_best_score = std::numeric_limits<long>::max();
+		}
+		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
+
+		if (run_time > cutoff) return;
 	}
 }
