@@ -21,7 +21,7 @@ public:
     // 核心功能1：根据 UCB1 算法选择下一个要使用的臂的索引
     int select_arm() {
         // 1. 如果有哪个臂一次都没试过，优先试一下（初始化）
-        for (int i = 0; i < alphas.size(); ++i) {
+        for (size_t i = 0; i < alphas.size(); ++i) {
             if (counts[i] == 0) { 
                 return i;
             }
@@ -31,7 +31,7 @@ public:
         int best_arm = 0;
         double max_ucb = -std::numeric_limits<double>::max();
 
-        for (int i = 0; i < alphas.size(); ++i) {
+        for (size_t i = 0; i < alphas.size(); ++i) {
 
             double n_i = static_cast<double>(counts[i]);
             double total_n = static_cast<double>(total_counts);
@@ -53,7 +53,7 @@ public:
     // reward: 那个臂表现得怎么样（例如：cost 降低了多少）
     void update(int arm_index, double reward) {
         
-        if (arm_index < 0 || arm_index >= alphas.size()) {
+        if (arm_index < 0 || (size_t)arm_index >= alphas.size()) {
             cout<<"Invalid arm index: "<<arm_index<<endl;
             return;// 无效索引
         }        
@@ -70,7 +70,7 @@ public:
 
     // 获取当前选中的 alpha 值
     double get_alpha(int arm_index) {
-        if (arm_index < 0 || arm_index >= alphas.size()) return alphas[0];
+        if (arm_index < 0 || (size_t)arm_index >= alphas.size()) return alphas[0];
         return alphas[arm_index];
     }
 

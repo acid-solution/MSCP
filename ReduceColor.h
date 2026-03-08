@@ -89,7 +89,7 @@ void build(){
 	for(auto v : remaining_vertex){
 		int max_deg = 0;
 		for (auto u : adjacency_list[v]){	//遍历节点 v 的所有邻居 u
-			if (adjacency_list[u].size() > max_deg){	//找出邻居中度数最大的节点
+			if (adjacency_list[u].size() > (size_t)max_deg){	//找出邻居中度数最大的节点
 				max_deg = adjacency_list[u].size();
 			}
 			if(max_deg > COLOR_NUM){
@@ -109,8 +109,8 @@ void build(){
 						//exit(0);
 	if (vertex_count > 2000) //顶点大于2000时才进行约简
 	for (auto v : remaining_vertex){//从每个点开始寻找团
-		//if (v != 0)
-		//find_clique(v);
+		if (v != 0)
+		find_clique(v);
 	}
 }
 
@@ -276,7 +276,7 @@ void init_color(){
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
 
-			if (color_v >= color_choice[u].size()) {
+			if ((size_t)color_v >= color_choice[u].size()) {
                 color_choice[u].resize(color_v + 1, 0);
             }
 
@@ -377,7 +377,7 @@ void init_color_mis(){
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
 
-			if (color_v >= color_choice[u].size()) {
+			if ((size_t)color_v >= color_choice[u].size()) {
                 color_choice[u].resize(color_v + 1, 0);
             }
 
@@ -455,7 +455,7 @@ long choose_conflict_node(){
 
 void choose_conflict_node_new(long bms){
 	//long bms = 100;
-	long iter = 0;
+	//long iter = 0;
 
 	//add all valid color to the vector
 	while (true)
@@ -473,7 +473,7 @@ void choose_conflict_node_new(long bms){
 		long best_color_score = -1;
 		for (long i = 0; i < bms; i++){
 			//with low prop ranom choose
-			long prop = rand() * 100 / RAND_MAX;
+			//long prop = rand() * 100 / RAND_MAX;
 			/*
 			if (prop < 2){
 				long index = rand() % valid_node.size();
@@ -520,7 +520,7 @@ void choose_conflict_node_new(long bms){
 
 long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示找到合适节点，0表示没有
 	//long bms = 100;
-	long iter = 0;
+	//long iter = 0;
 
 	long best_node = -1;
 	long best_color = -1;
@@ -592,7 +592,7 @@ long remove_conflict_new2(long bms){//随机采样基于评分去除所有冲突
 	long max_iter_rc = vertex_count;
 	long iter_rc = 0;
 	//long bms = 10;
-	long problem = 0;
+	//long problem = 0;
 	
 	//if (problem > 0) cout << "problem:" << problem << endl;
 	/*
@@ -672,7 +672,7 @@ long remove_conflict_new4(){//随机选择冲突节点，染色后tabu锁住
 	if (edge_conflict > 0){
 		long index = rand() % conflict_node_queue.size();
 		long node = conflict_node_queue[index];
-		long current_color = vertex_color[node];
+		//long current_color = vertex_color[node];
 		long new_color = -1;
 		current_iter++;
 		no_impr++;
@@ -769,7 +769,7 @@ void big_pertub(long pertub_num, long bms, long conflict_weight){
 	for (long i = 0; i < pertub_num; ++i){
 		long best_node = -1;
 		long best_color = -1;
-		long best_node_old_color = -1;
+		//long best_node_old_color = -1;
 		long best_choose_score = -vertex_count;
 		
 		long rand_color = rand() * 100 / RAND_MAX;
@@ -839,7 +839,7 @@ void big_pertub(long pertub_num, long bms, long conflict_weight){
 			if (choose_score > best_choose_score){
 				best_node = node;
 				best_color = new_color;
-				best_node_old_color = vertex_color[node];
+				//best_node_old_color = vertex_color[node];
 				best_choose_score = choose_score;
 			}
 		}
@@ -931,7 +931,7 @@ bool color_node_old(long node, long color){
 	//update info of neighborhood nodes
 	for (auto v : temp_adjacency_list[node]){
 
-		if (color >= color_choice[v].size()) {	//如果新颜色 超出 邻居颜色选择数组范围，扩展该数组
+		if ((size_t)color >= color_choice[v].size()) {	//如果新颜色 超出 邻居颜色选择数组范围，扩展该数组
             color_choice[v].resize(color + 1, 0);
         }
 
@@ -974,7 +974,7 @@ bool color_node_old(long node, long color){
 			}
 
 			//update good_node_color  
-			for (long index = 0; index < good_node_color[v].size(); index++){
+			for (size_t index = 0; index < good_node_color[v].size(); index++){
 				long neighbor_c = good_node_color[v][index];
 				if (color_choice[v][neighbor_c] > color_choice[v][current_neighbor_color]){
 					long end_color = *good_node_color[v].rbegin();
@@ -1074,14 +1074,14 @@ bool color_node(long node, long color){
         }
     }
 	
-	if (color >= color_choice[node].size()) {	//如果新颜色 超出 当前节点颜色选择数组范围，扩展该数组
+	if ((size_t)color >= color_choice[node].size()) {	//如果新颜色 超出 当前节点颜色选择数组范围，扩展该数组
     	color_choice[node].resize(color + 1, 0);
     }
 
     // update info of neighborhood nodes
     for (auto v : temp_adjacency_list[node]){	//遍历node的邻居节点
 
-		if (color >= color_choice[v].size()) {	//如果新颜色 超出 邻居颜色选择数组范围，扩展该数组
+		if ((size_t)color >= color_choice[v].size()) {	//如果新颜色 超出 邻居颜色选择数组范围，扩展该数组
         	color_choice[v].resize(color + 1, 0);
     	}
 
@@ -1309,7 +1309,6 @@ void localsearch_MAB_1(int cutoff){
 
 	// [新增] 引入新的局部地形历史记录 (用 vector 替代旧的两个账本，保持轻量)
     std::vector<long> recent_scores;
-
     // 记录当前周期内见过的最好分数（初始化为最大值）
     long current_cycle_best_score = std::numeric_limits<long>::max();
 
