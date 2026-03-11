@@ -9,8 +9,8 @@ int main(int argc, char* argv[]){
 		remove_conflict_bms = bms;
 		bms_count = bms;
 	}
-	//conflict_weight = density / 3;
-	conflict_weight = density / atof(argv[4]);
+	conflict_weight = density / 3;
+	//conflict_weight = density / atof(argv[4]);
 
 	string file_name;
 	int cutoff = atoi(argv[2]);
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]){
     build();
 	//cout << "build done" << endl;
 	
-	init_color_mis(); 
+	init_color(); 
 	//cout << "init color done" << endl;
 
 	//cout<<"localsearch begin"<<endl;
