@@ -1,6 +1,5 @@
 #pragma once
 #include "basic.h"
-#include "MABSolver.h"
 
 bool cmp_by_edgeout(long x, long y){
 	return x > y;
@@ -17,21 +16,21 @@ void read_file(string file_name){
 	string line;
 	istringstream is;
 	string p, tmp;
-cout<<"reading file start"<<endl;
+//cout<<"reading file start"<<endl;
 	do {
 		getline(in_file, line);
 		is.clear();
 		is.str(line);
 		is >> p >> tmp >> vertex_count >> edge_count;
 	} while (p != "p");
-cout<<"end reading file start"<<endl;
+//cout<<"end reading file start"<<endl;
 	density = edge_count / vertex_count; 
 
 	adjacency_list.resize(vertex_count + 1);
     temp_adjacency_list.resize(vertex_count + 1);
 
 	long v1, v2;
-cout<<"begin reading edges"<<endl;
+//cout<<"begin reading edges"<<endl;
 	if (vertex_count < 2000) while (in_file >> tmp >> v1 >> v2) {
 		if (v1 == v2) continue;
 		v1 = v1 - 1;
@@ -764,6 +763,123 @@ void perturbation(long bms, long conflict_weight){
 	tabu[best_node] = current_iter + TABU_TIME;
 }
 
+void perturbation_new(long bms, long conflict_weight){
+    // 1. 判空保护，防止在空图或搜索末期报错
+    if (remaining_vertex.size() == 0) return;
+
+    // 2. 使用 static 避免频繁的内存分配销毁
+    static vector<bool> visited;
+    if (visited.size() <= vertex_count) {
+        visited.assign(vertex_count + 1, false);
+    }
+    //通过 visited_history 记录本次修改的节点，在函数末尾统一重置，避免在循环中频繁访问 visited 数组导致的性能下降
+    vector<long> visited_history; 
+
+    // 3. 随机选择局部子图的中心锚点
+    long center_index = rand() % remaining_vertex.size();
+    long seed_node = remaining_vertex[center_index];
+    vector<long> candidates;
+    candidates.push_back(seed_node);
+    visited[seed_node] = true;
+    visited_history.push_back(seed_node); 
+    //设定全局收集上限，严格控制局部搜索的规模，防止稠密图导致耗时激增
+    long max_candidates = 500; 
+
+    // 4. 收集一阶邻居
+    vector<long> first_order;
+    long deg1 = temp_adjacency_list[seed_node].size();
+    if (deg1 > 0) {
+        //随机生成起始索引
+        long start_idx = rand() % deg1; 
+        for (long i = 0; i < deg1; ++i) {
+            if (candidates.size() >= max_candidates) break; 
+            //取模实现环形遍历
+            long v = temp_adjacency_list[seed_node][(start_idx + i) % deg1];
+            if (!visited[v]) {
+                first_order.push_back(v);
+                candidates.push_back(v);
+                visited[v] = true;
+                visited_history.push_back(v); 
+            }
+        }
+    }
+
+    // 5. 对一阶邻居洗牌，增加随机性，防止后续的二阶收集总是从同一批节点开始，导致局部搜索的多样性不足
+    for (long i = (long)first_order.size() - 1; i > 0; --i) {
+        swap(first_order[i], first_order[rand() % (i + 1)]);
+    }
+
+    // 6. 收集二阶邻居（应用同等截断规则）
+    for (auto u : first_order){
+        if (candidates.size() >= max_candidates) break; 
+        long deg2 = temp_adjacency_list[u].size();
+        if (deg2 == 0) continue;
+
+		//同上
+        long start_idx2 = rand() % deg2; 
+        for (long i = 0; i < deg2; ++i){
+            if (candidates.size() >= max_candidates) break; 
+            long w = temp_adjacency_list[u][(start_idx2 + i) % deg2];
+            if (!visited[w]) {
+                candidates.push_back(w);
+                visited[w] = true;
+                visited_history.push_back(w); 
+            }
+        }
+    }
+
+    // 7. 评估候选节点的提色收益
+    //使用 tuple 存储评估结果，格式：<收益得分, 节点ID, 目标颜色>
+    vector<tuple<long, long, long>> evaluated_nodes;
+    //预分配内存
+    evaluated_nodes.reserve(candidates.size()); 
+
+    for (auto node : candidates) {
+        long current_color = vertex_color[node];
+        //随机分配一个更大的颜色编号
+        long new_color = rand() % (max_color - current_color + 1) + current_color + 1;
+        
+        //基础得分：提色本身带来目标函数恶化，记为负收益
+        long choose_score = (current_color - new_color); 
+
+        //打分该节点
+        for (auto v : temp_adjacency_list[node]){
+            if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
+                choose_score += (vertex_color[v] - current_color) / 3;
+            }
+            if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
+                choose_score += (vertex_color[v] - current_color);
+            }
+            if (vertex_color[v] == new_color) {
+                choose_score -= conflict_weight;
+            }
+        }
+        evaluated_nodes.push_back(make_tuple(choose_score, node, new_color));
+    }
+
+    // 8. 执行局部最优扰动与禁忌锁定
+    //依据 tuple 的第一个元素（choose_score）进行降序排列
+    sort(evaluated_nodes.rbegin(), evaluated_nodes.rend());
+    
+    //选取前 bms 个得分最高的节点执行提色扰动
+    long num_to_perturb = std::min((long)bms, (long)evaluated_nodes.size());
+
+    for (long i = 0; i < num_to_perturb; ++i) {
+        long target_node = get<1>(evaluated_nodes[i]);
+        long target_color = get<2>(evaluated_nodes[i]);
+        //改变节点颜色
+        color_node(target_node, target_color);
+        no_impr++;
+        current_iter++;
+        tabu[target_node] = current_iter + TABU_TIME; 
+    }
+
+    //仅重置本次被修改过的节点标记
+    for (auto v : visited_history) {
+        visited[v] = false; 
+    }
+}
+
 void big_pertub(long pertub_num, long bms, long conflict_weight){
 
 	for (long i = 0; i < pertub_num; ++i){
@@ -1283,7 +1399,7 @@ void localsearch(int cutoff){
 			no_impr = 0;
 			big_pert_num++;
 		}
-		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
+		if (edge_conflict == 0) perturbation_new(pertub_bms, conflict_weight);//普通扰动
 
 	}
 }

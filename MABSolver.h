@@ -54,7 +54,7 @@ public:
     void update(int arm_index, double reward) {
         
         if (arm_index < 0 || (size_t)arm_index >= alphas.size()) {
-            cout<<"Invalid arm index: "<<arm_index<<endl;
+            std::cout<<"Invalid arm index: "<<arm_index<<std::endl;
             return;// 无效索引
         }        
 

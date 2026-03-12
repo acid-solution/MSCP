@@ -8,8 +8,10 @@
 #include <unistd.h>
 #include <algorithm>
 #include <cmath>
+#include <tuple>
 
 #include "util.h"
+#include "MABSolver.h"
 
 #define COLOR_NUM 1000
 
