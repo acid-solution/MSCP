@@ -106,11 +106,48 @@ void build(){
 						
 
 						//exit(0);
-	if (vertex_count > 2000) //顶点大于2000时才进行约简
-	for (auto v : remaining_vertex){//从每个点开始寻找团
-		if (v != 0)
-		find_clique(v);
-	}
+	// if (vertex_count > 2000) //顶点大于2000时才进行约简
+	// for (auto v : remaining_vertex){//从每个点开始寻找团
+	// 	if (v != 0)
+	// 	find_clique(v);
+	// }
+}
+
+void reduction_test(){
+    vector<long> deg_queue; // 模拟队列，存储满足移除条件的节点
+    
+    // 1. 初始化阶段：扫描所有存活的节点，找到初始度数 <= 1 的节点并入队
+    for (auto v : remaining_vertex) {
+        if (temp_adjacency_list[v].size() <= 1) {
+            deg_queue.push_back(v);
+            remove_indicator[v] = true; // 提前打上移除标记，防止在后续迭代中重复入队
+        }
+    }
+
+    long head = 0;
+    // 2. 级联移除阶段：只要队列不为空，就一直处理
+    while (head < deg_queue.size()) {
+        long u = deg_queue[head++];
+        
+        // 暂存 u 的所有邻居。
+        // 因为调用 remove_clique 后，u 及其邻居的 temp_adjacency_list 会被修改
+        vector<long> neighbors = temp_adjacency_list[u];
+        
+        // 复用已有的 remove_clique 逻辑：
+        // 1. 在邻居的 temp_adjacency_list 中删掉 u
+        // 2. 将 u 从 remaining_vertex 中 remove 掉
+        remove_clique(u);
+        reduction_num++; // 更新约简节点数统计
+        remove_num++;    // 维护你原有的基础计数器
+
+        // 3. 检查受影响的邻居，如果有邻居因此度数降到了 1 或 0，将其入队
+        for (auto w : neighbors) {
+            if (!remove_indicator[w] && temp_adjacency_list[w].size() <= 1) {
+                remove_indicator[w] = true;
+                deg_queue.push_back(w);
+            }
+        }
+    }
 }
 
 bool find_clique(long vv){
