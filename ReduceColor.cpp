@@ -24,10 +24,6 @@ int main(int argc, char* argv[]){
 	//cout << "read file done" << endl;
 	
     build();
-
-	reduction_test();
-	cout<<file_name<<" "<<vertex_count<<" "<<remaining_vertex.size()<<" "<<remaining_vertex.size() * 1.0 / vertex_count <<endl;
-	exit(0);
 	//cout << "build done" << endl;
 	
 	init_color(); 

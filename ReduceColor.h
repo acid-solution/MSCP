@@ -106,11 +106,11 @@ void build(){
 						
 
 						//exit(0);
-	// if (vertex_count > 2000) //顶点大于2000时才进行约简
-	// for (auto v : remaining_vertex){//从每个点开始寻找团
-	// 	if (v != 0)
-	// 	find_clique(v);
-	// }
+	if (vertex_count > 2000) //顶点大于2000时才进行约简
+	for (auto v : remaining_vertex){//从每个点开始寻找团
+		if (v != 0)
+		find_clique(v);
+	}
 }
 
 void reduction_test(){
@@ -1436,7 +1436,7 @@ void localsearch(int cutoff){
 			no_impr = 0;
 			big_pert_num++;
 		}
-		if (edge_conflict == 0) perturbation_new(pertub_bms, conflict_weight);//普通扰动
+		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
 
 	}
 }
