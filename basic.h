@@ -22,14 +22,15 @@ using namespace std;
 bool remove_clique(long v);
 bool color_node(long node, long color);
 long compute_score();
-bool swap_clique_color();
-void color_graph();
 void init_color();
-long choose_conflict_node();
 void swap_two_color(long color1, long color2);
 bool find_clique(long v);
 void update_best_solution();
 bool verify_solution();
+
+bool color_node_reduction(long node, long color);
+void build_reduction();
+long compute_score_reduction();
 
 
 vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
@@ -88,9 +89,18 @@ long big_pertub_bms = bms;
 long max_no_impr = max_no_impr_basic;
 
 
-int reduction_num = 0;
-int unlock_propagate_edge_num = edge_count;
-int unlock_propagate_ver_num = vertex_count;
+
+// 新增：用于存储 DP 惩罚和森林常数
+vector<vector<long>> dp_penalty; 
+long forest_constant_cost = 0;
+// 新增：安全查询函数（如果颜色超出数组长度，说明该颜色非常大，惩罚必定为 0）
+inline long get_penalty(long u, long c) {
+    if (c < dp_penalty[u].size()) {
+        return dp_penalty[u][c];
+    }
+    return 0; 
+}
+
 
 class Vertex_vec_with_index {
 public:

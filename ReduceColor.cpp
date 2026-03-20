@@ -23,14 +23,14 @@ int main(int argc, char* argv[]){
 	read_file(file_name);
 	//cout << "read file done" << endl;
 	
-    build();
+    build_reduction();
 	//cout << "build done" << endl;
 	
-	init_color(); 
+	init_color_reduction(); 
 	//cout << "init color done" << endl;
 
 	//cout<<"localsearch begin"<<endl;
-	localsearch(cutoff);
+	localsearch_reduction(cutoff);
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<endl;
 
     return 0;
