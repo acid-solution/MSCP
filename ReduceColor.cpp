@@ -31,7 +31,9 @@ int main(int argc, char* argv[]){
 
 	//cout<<"localsearch begin"<<endl;
 	localsearch_reduction(cutoff);
-	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<endl;
+	//cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<endl;
+
+	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
 
     return 0;
 }

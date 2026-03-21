@@ -1494,7 +1494,7 @@ void update_best_solution_reduction(){
 		if (best_color != current_color) color_node_reduction(node, best_color);
 	}
 
-	long score = compute_score_reduction();//计算当前解的评分
+	long score = cost + remaining_vertex.size();//计算当前解的评分
 	if (score < best_score){//更新最优解和最优评分
 		best_score = score;//更新最优评分
 		for (auto v : remaining_vertex){
@@ -1657,7 +1657,8 @@ bool color_node_reduction(long node, long color){
 			}
 
 			// 2. 只需一层 O(C_max) 循环，内部是 O(1) 判断！
-			for (long new_c = 0; new_c <= max_color + 1; new_c++){
+			long limit_v = std::min((long)eff_curr_v, max_color + 2);
+			for (long new_c = 0; new_c < limit_v; new_c++){
 				if (new_c == current_neighbor_color) continue;
 
 				long eff_new_c = new_c + get_penalty(v, new_c);
@@ -1694,7 +1695,8 @@ bool color_node_reduction(long node, long color){
     
     long eff_node_color = color + get_penalty(node, color);
 
-    for (long new_c = 0; new_c <= max_color + 1; new_c++){
+	long limit_node = std::min((long)eff_node_color, max_color + 2);
+    for (long new_c = 0; new_c < limit_node; new_c++){
         if (new_c == color) continue;
 
         long eff_new_c = new_c + get_penalty(node, new_c);
@@ -1802,6 +1804,36 @@ void perturbation_reduction(long bms, long conflict_weight){
 	color_node_reduction(best_node, best_color);
 	current_iter++;
 	tabu[best_node] = current_iter + TABU_TIME;
+}
+
+long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu锁住
+	if (edge_conflict > 0){
+		long index = rand() % conflict_node_queue.size();
+		long node = conflict_node_queue[index];
+		//long current_color = vertex_color[node];
+		long new_color = -1;
+		current_iter++;
+		no_impr++;
+
+		if (conf[node] == 0) return 0;
+		if (tabu[node] > current_iter) return 0;
+		new_color = max_color + 1;
+
+		if (new_color >= COLOR_NUM) 
+			for (long i = 0; i < COLOR_NUM; i++) {
+				if (color_choice[node][i] == 0) { 
+					new_color = i; break; } }
+
+		if (new_color >= COLOR_NUM) 
+			new_color = new_color % COLOR_NUM;
+		
+		color_node_reduction(node, new_color);
+		current_iter++;
+		no_impr++;
+		tabu[node] = current_iter + TABU_TIME;
+	}
+
+	return 1;
 }
 
 void perturbation_new_reduction(long bms, long conflict_weight){
@@ -2107,6 +2139,10 @@ void init_color_reduction() {
 
         // 大佬 u 确定座位
         vertex_color[u] = best_c;
+
+		// <--- 新增：同步累加初始 cost
+        cost += best_c + get_penalty(u, best_c);
+
         if (best_c > max_color) {
             max_color = best_c;
         }
@@ -2130,7 +2166,7 @@ void init_color_reduction() {
     // 初始化排色保证了没有任何一条边冲突
     edge_conflict = 0; 
     // 计算初始起步分数
-    best_score = compute_score_reduction(); 
+    best_score = cost + remaining_vertex.size(); // 因为颜色编号从0开始，所以每个节点的基础代价是 vertex_color[v] + 1
     
     for (auto v : remaining_vertex) {
         best_solution[v] = vertex_color[v];
@@ -2159,7 +2195,7 @@ if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 		}
 		
 		long score = 0;
-		if (edge_conflict == 0) score = compute_score_reduction();//如果没有冲突，就计算分数，计算时间
+		if (edge_conflict == 0) score = cost + remaining_vertex.size();//如果没有冲突，就计算分数，计算时间
 		best_time = clock();
 		double run_time;
 		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
