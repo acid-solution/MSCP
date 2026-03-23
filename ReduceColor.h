@@ -2191,7 +2191,7 @@ if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 			tabu[best_node] = current_iter + TABU_TIME;
 		}
 		else{
-			remove_conflict_new4();//贪心结束，进行冲突移除
+			remove_conflict_new4_reduction();//贪心结束，进行冲突移除
 		}
 		
 		long score = 0;
