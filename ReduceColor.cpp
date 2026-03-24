@@ -24,17 +24,15 @@ int main(int argc, char* argv[]){
 	//cout<<file_name<<endl;
 	begin_time = clock();
 	read_file(file_name);
-	//cout << "read file done" << endl;
-	
-    build_reduction();
-	//cout << "build done" << endl;
-	
-	init_color_reduction(); 
-	//cout << "init color done" << endl;
 
-	//cout<<"localsearch begin"<<endl;
+	build_reduction();
+	init_color_reduction(); 
 	localsearch_reduction(cutoff);
-	//cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<endl;
+
+	// build();
+	// init_color();
+	// localsearch(cutoff);
+
 
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
 

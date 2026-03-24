@@ -101,6 +101,10 @@ inline long get_penalty(long u, long c) {
     return 0; 
 }
 
+// 新增：动态松弛惩罚的权重，初始为 1.0（全额惩罚）
+double penalty_weight = 1.0;
+
+
 
 class Vertex_vec_with_index {
 public:
