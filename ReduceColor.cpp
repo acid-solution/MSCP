@@ -33,6 +33,10 @@ int main(int argc, char* argv[]){
 	// init_color();
 	// localsearch(cutoff);
 
+	if (!verify_solution()){//验证解的正确性
+		cout << "solution error" << endl;
+		getchar();
+	}
 
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
 

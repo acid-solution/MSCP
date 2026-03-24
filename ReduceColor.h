@@ -1215,10 +1215,6 @@ void localsearch(int cutoff){
 		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
 		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解
 			update_best_solution();//更新最优解
-			if (!verify_solution()){//验证解的正确性
-				cout << "solution error" << endl;
-				getchar();
-			}
 			final_time = run_time;//记录最终时间
 			no_impr = 0;
 		}
@@ -1542,15 +1538,15 @@ void update_best_solution_reduction(){
         }
     }
 
-    // 2. 全局颜色集合交换
-    for (long i = 1; i <= max_color; i++){
-        for (long j = i; j <= max_color; j++){
-            if (i != j) {
-                // 不再依赖失效的人数统计，让 swap 函数自己去算 DP 账本
-                swap_two_color_reduction(j, i - 1);
-            }
-        }
-    }
+    // // 2. 全局颜色集合交换
+    // for (long i = 1; i <= max_color; i++){
+    //     for (long j = i; j <= max_color; j++){
+    //         if (i != j) {
+    //             // 不再依赖失效的人数统计，让 swap 函数自己去算 DP 账本
+    //             swap_two_color_reduction(j, i - 1);
+    //         }
+    //     }
+    // }
 
     // 3. 统计并更新最优解
     long score = cost + remaining_vertex.size();
@@ -2513,10 +2509,6 @@ if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
 		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解
 			update_best_solution_reduction();//更新最优解
-			if (!verify_solution()){//验证解的正确性
-				cout << "solution error" << endl;
-				getchar();
-			}
 			final_time = run_time;//记录最终时间
 			no_impr = 0;
 		}
