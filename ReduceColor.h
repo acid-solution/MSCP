@@ -2307,6 +2307,7 @@ void build_reduction(){
 	}
 						//cout << "build done 3" << endl;
 	tree_dp_reduction();
+	
 }
 
 void init_color_reduction(){

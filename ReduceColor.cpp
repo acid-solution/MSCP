@@ -29,14 +29,18 @@ int main(int argc, char* argv[]){
 	init_color_reduction(); 
 	localsearch_reduction(cutoff);
 
-	// build();
-	// init_color();
-	// localsearch(cutoff);
+	build();
+	init_color();
+	localsearch(cutoff);
+	// 将历史最优的合法解恢复到当前图中
+    for (auto v : remaining_vertex){
+        vertex_color[v] = best_solution[v];
+    }
 
-	if (!verify_solution()){//验证解的正确性
-		cout << "solution error" << endl;
-		getchar();
-	}
+    if (!verify_solution()){//验证解的正确性
+        cout << "solution error" << endl;
+        return -1; // 验证失败直接异常退出即可
+    }
 
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
 
