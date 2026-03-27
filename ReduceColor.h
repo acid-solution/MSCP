@@ -106,11 +106,11 @@ void build(){
 						
 
 						//exit(0);
-	if (vertex_count > 2000) //顶点大于2000时才进行约简
-	for (auto v : remaining_vertex){//从每个点开始寻找团
-		if (v != 0)
-		find_clique(v);
-	}
+	// if (vertex_count > 2000) //顶点大于2000时才进行约简
+	// for (auto v : remaining_vertex){//从每个点开始寻找团
+	// 	if (v != 0)
+	// 	find_clique(v);
+	// }
 }
 
 void reduction_test(){

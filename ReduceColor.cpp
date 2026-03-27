@@ -25,17 +25,21 @@ int main(int argc, char* argv[]){
 	begin_time = clock();
 	read_file(file_name);
 
-	build_reduction();
-	init_color_reduction(); 
-	localsearch_reduction(cutoff);
+	// build_reduction();
+	// init_color_reduction(); 
+	// localsearch_reduction(cutoff);
 
 	build();
+	tree_dp_reduction();
 	init_color();
 	localsearch(cutoff);
+
+
 	// 将历史最优的合法解恢复到当前图中
     for (auto v : remaining_vertex){
         vertex_color[v] = best_solution[v];
     }
+	best_score = compute_score_reduction(); // 计算最终得分
 
     if (!verify_solution()){//验证解的正确性
         cout << "solution error" << endl;
