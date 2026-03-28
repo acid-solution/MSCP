@@ -1530,12 +1530,17 @@ void update_best_solution_reduction(){
     long sz = remaining_vertex.size();
     long start_index = rand() % sz;
     
+	long current_idx = start_index;
     // 1. 单点降色尝试
     for (long i = 0; i < sz; i++){
-        //long node = (start_index + i) % sz;
-		long index = (start_index + i) % sz;
-   		long node = remaining_vertex[index]; // 通过索引获取真实的节点 ID
-		
+
+		long node = remaining_vertex[current_idx];
+		current_idx++;
+		if (current_idx >= sz) {
+			current_idx = 0;
+		}
+
+
         long current_color = vertex_color[node];
         long best_color = current_color;
         
