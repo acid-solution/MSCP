@@ -54,6 +54,8 @@ vector<long> local_opt_solution;
 vector<vector<long>> good_node_color; //对于每个节点 v，good_node_color[v] 维护了一个候选颜色列表。这个列表里的颜色通常是“好移动”的目标颜色
 vector<vector<short>> good_node_color_index; //在color_node函数中使用，用于O(1)查询，已删除
 
+vector<vector<long>> color_penalty_sum;
+
 long colored_vertex_num = 0; //the number of vertex colored of all graph
 long max_color = -1;
 long edge_conflict = 0;
@@ -69,7 +71,7 @@ unsigned long bms_count;
 long vertex_count;
 long edge_count;
 long cost = 0;//当前解的花费
-long remove_score;
+long remove_score = 0;
 long remove_num;
 double density;
 

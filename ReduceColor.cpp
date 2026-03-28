@@ -25,14 +25,25 @@ int main(int argc, char* argv[]){
 	begin_time = clock();
 	read_file(file_name);
 
-	// build_reduction();
-	// init_color_reduction(); 
-	// localsearch_reduction(cutoff);
+
 
 	build();
+
+	// if (vertex_count > 2000) //顶点大于2000时才进行约简
+	// for (auto v : remaining_vertex){//从每个点开始寻找团
+	// 	if (v != 0)
+	// 	find_clique(v);
+	// }
+
 	tree_dp_reduction();
-	init_color();
-	localsearch(cutoff);
+	
+
+	// init_color(); 
+	// localsearch(cutoff);
+
+
+	init_color_reduction();
+	localsearch_reduction(cutoff);
 
 
 	// 将历史最优的合法解恢复到当前图中
@@ -43,7 +54,7 @@ int main(int argc, char* argv[]){
 
     if (!verify_solution()){//验证解的正确性
         cout << "solution error" << endl;
-        return -1; // 验证失败直接异常退出即可
+        return -1;
     }
 
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
