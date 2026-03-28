@@ -1827,7 +1827,7 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
             long current_color = vertex_color[node];
             long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
             
-            long score = (current_color - new_color) + penalty_diff + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
+            double score = (current_color - new_color) + penalty_diff + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
 
             if (score > best_color_score){
                 best_color_score = score;
@@ -1899,15 +1899,18 @@ long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu
 
 		if (conf[node] == 0) return 0;
 		if (tabu[node] > current_iter) return 0;
+
 		new_color = max_color + 1;
-
-		if (new_color >= COLOR_NUM) 
-			for (long i = 0; i < COLOR_NUM; i++) {
-				if (color_choice[node][i] == 0) { 
-					new_color = i; break; } }
-
-		if (new_color >= COLOR_NUM) 
-			new_color = new_color % COLOR_NUM;
+		bool found_zero_conflict = false;
+		// 优先在当前已使用的颜色范围内找一个零冲突的
+		for (long i = 0; i <= max_color; i++) {
+			// 加上安全判断，防止 color_choice 越界
+			if (i < color_choice[node].size() && color_choice[node][i] == 0) { 
+				new_color = i; 
+				found_zero_conflict = true;
+				break; 
+			}
+		}
 		
 		color_node_reduction(node, new_color);
 		current_iter++;
