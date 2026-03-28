@@ -1871,7 +1871,7 @@ void perturbation_reduction(long bms, long conflict_weight){
 		}
 	}
 	no_impr++;
-	color_node(best_node, best_color);
+	color_node_reduction(best_node, best_color);
 	current_iter++;
 	tabu[best_node] = current_iter + TABU_TIME;
 }
