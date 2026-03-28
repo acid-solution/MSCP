@@ -1532,7 +1532,10 @@ void update_best_solution_reduction(){
     
     // 1. 单点降色尝试
     for (long i = 0; i < sz; i++){
-        long node = (start_index + i) % sz;
+        //long node = (start_index + i) % sz;
+		long index = (start_index + i) % sz;
+   		long node = remaining_vertex[index]; // 通过索引获取真实的节点 ID
+		
         long current_color = vertex_color[node];
         long best_color = current_color;
         
@@ -1575,6 +1578,13 @@ void update_best_solution_reduction(){
 }
 
 bool color_node_reduction(long node, long color){
+
+	if (vertex_color[node] == -1) {
+    cout << "Error: Trying to color an uninitialized or removed node!" << endl;
+    return false;
+	}
+
+
     // 使用线性查找替代索引数组
     node_score[node] = 0; // 分数重置
     for (auto v : temp_adjacency_list[node]){
@@ -1586,16 +1596,14 @@ bool color_node_reduction(long node, long color){
     long old_color = vertex_color[node];
     
     //维护swap要用的数据结构
-    if (old_color != -1) { // 确保不是初始化阶段的未染色状态
-        long limit = dp_penalty[node].size(); 
-        for (long target_c = 0; target_c < limit; target_c++) {
-            long p = get_penalty(node, target_c);
-            if (p > 0) {
-                // node 离开了 old_color 阵营，old_color 阵营未来的账单里不再包含 node
-                color_penalty_sum[old_color][target_c] -= p;
-                // node 加入了新 color 阵营，新 color 阵营未来的账单必须算上 node
-                color_penalty_sum[color][target_c] += p;
-            }
+    long limit = dp_penalty[node].size(); 
+    for (long target_c = 0; target_c < limit; target_c++) {
+        long p = get_penalty(node, target_c);
+        if (p > 0) {
+            // node 离开了 old_color 阵营，old_color 阵营未来的账单里不再包含 node
+            color_penalty_sum[old_color][target_c] -= p;
+            // node 加入了新 color 阵营，新 color 阵营未来的账单必须算上 node
+            color_penalty_sum[color][target_c] += p;
         }
     }
 
@@ -1855,12 +1863,16 @@ void perturbation_reduction(long bms, long conflict_weight){
 		//该节点变成新颜色后，邻居可以换成旧颜色，计算更换后的得分
 		for (auto v : temp_adjacency_list[node]){//遍历该节点的所有邻居节点
 			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){//该邻居除了该节点为旧颜色外，还有其他邻居为旧颜色，但是该邻居的颜色比旧颜色大
-					long delta_color = (vertex_color[v] - current_color) / 3;//有潜力，计算1/3
-					choose_score += delta_color ;
+					long old_eff = vertex_color[v] + get_penalty(v, vertex_color[v]);
+    				long new_eff = current_color + get_penalty(v, current_color);
+    				long delta_color = (old_eff - new_eff) / 3;
+    				choose_score += delta_color;
 			}
 			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){//该邻居只有该节点为旧颜色，且邻居的颜色比旧颜色大
-					long delta_color = (vertex_color[v] - current_color);//绝对能降色，计算全部
-					choose_score += delta_color;
+					long old_eff = vertex_color[v] + get_penalty(v, vertex_color[v]);
+    				long new_eff = current_color + get_penalty(v, current_color);
+    				long delta_color = old_eff - new_eff; // 用真实有效代价的差值
+    				choose_score += delta_color;
 			}
 			if (vertex_color[v] == new_color) choose_score -= conflict_weight;//如果该邻居的颜色和新颜色相同，说明会产生冲突，扣分
 		}
@@ -2089,11 +2101,15 @@ void big_pertub_reduction(long pertub_num, long bms, long conflict_weight){
 			for (auto v : temp_adjacency_list[node]){
 
 				if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
-					long delta_color = (vertex_color[v] - current_color);
-					choose_score += delta_color / 2;
+					long old_eff = vertex_color[v] + get_penalty(v, vertex_color[v]);
+					long new_eff = current_color + get_penalty(v, current_color);
+					long delta_color = (old_eff - new_eff) / 2; 
+					choose_score += delta_color;
 				}
 				if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
-					long delta_color = (vertex_color[v] - current_color);
+					long old_eff = vertex_color[v] + get_penalty(v, vertex_color[v]);
+					long new_eff = current_color + get_penalty(v, current_color);
+					long delta_color = old_eff - new_eff; // 用真实有效代价的差值
 					choose_score += delta_color;
 				}
 
