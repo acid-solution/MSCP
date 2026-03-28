@@ -2142,6 +2142,18 @@ void init_color_reduction(){
 		color_use_number[color]++;					//维护颜色使用数量	
 	}
 
+	// 【修复】初始化 color_penalty_sum，与初始染色状态同步
+	for (auto v : remaining_vertex) {
+		long c_src = vertex_color[v];
+		for (long target_c = 0; target_c < (long)dp_penalty[v].size(); target_c++) {
+			long p = get_penalty(v, target_c);
+			if (p > 0) {
+				color_penalty_sum[c_src][target_c] += p;
+			}
+		}
+	}
+
+
 	for (auto v : remaining_vertex){//初始化 color_choice 矩阵和冲突信息					
 		long color_v = vertex_color[v];				//获取节点 v 的颜色编号
 		for (auto u : temp_adjacency_list[v]){		//遍历节点 v 的所有邻居 u
@@ -2165,11 +2177,18 @@ void init_color_reduction(){
         }
 		
 		//初始化good_node_color 数组，其中是可以降低冲突并降低花费的选择，之后reduce conflict and color 要从这里面选择
-		long current_color = vertex_color[v];										//获取节点 v 的当前颜色编号
-		for (long new_color = 0; new_color < current_color; new_color++){			//遍历所有比当前颜色编号小的颜色
-			if (color_choice[v][new_color] <= color_choice[v][current_color]){		//如果新颜色的冲突数小于当前颜色的冲突数
-				//good_node_color_index[v][new_color] = good_node_color[v].size();
-				good_node_color[v].emplace_back(new_color);							//将该颜色添加到节点 v 的好颜色列表中
+		long current_color = vertex_color[v];	
+		
+		long eff_curr_v = current_color + get_penalty(v, current_color);
+		long limit_v = std::min((long)eff_curr_v, max_color + 2);
+		for (long new_color = 0; new_color < limit_v; new_color++) {
+			if (new_color == current_color) continue;
+			long eff_new_color = new_color + get_penalty(v, new_color);
+			//获取冲突数
+			short conf_new_color = (new_color < (long)color_choice[v].size())? color_choice[v][new_color] : 0;
+			//如果新颜色的有效代价更小，并且冲突数不超过当前颜色的冲突数，则将该颜色添加到节点 v 的好颜色列表中
+			if (eff_new_color < eff_curr_v &&conf_new_color <= color_choice[v][current_color]) {
+				good_node_color[v].emplace_back(new_color);
 			}
 		}
     }
