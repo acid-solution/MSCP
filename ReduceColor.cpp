@@ -21,7 +21,7 @@ int main(int argc, char* argv[]){
 	srand(seed);
 	file_name = argv[1];
 
-	max_iter = atoi(argv[4]);
+	//max_iter = atoi(argv[4]);
 		
 	//cout<<file_name<<endl;
 	begin_time = clock();
@@ -37,15 +37,15 @@ int main(int argc, char* argv[]){
 	// 	find_clique(v);
 	// }
 
-	// tree_dp_reduction();
+	tree_dp_reduction();
 	
 
-	init_color(); 
-	localsearch(cutoff);
+	// init_color(); 
+	// localsearch(cutoff);
 
 
-	//  init_color_reduction();
-	//  localsearch_reduction(cutoff);
+	init_color_reduction();
+	localsearch_reduction(cutoff);
 
 
 	// 将历史最优的合法解恢复到当前图中
@@ -59,7 +59,43 @@ int main(int argc, char* argv[]){
         return -1;
     }
 
-	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
+	// ================= 统计打表代码 =================
+    long penalty_node_count = 0;
+    long normal_node_count = 0;
+    long total_freq_penalty = 0;
+    long total_freq_normal = 0;
+
+    // 只统计 remaining_vertex（存活在约简图中的节点）
+    for (auto v : remaining_vertex) {
+        // 如果 dp_penalty[v] 数组有大小，说明它吸收了被剥离节点的惩罚，就是带悬挂的节点
+        if (dp_penalty[v].size() > 0) {
+            penalty_node_count++;
+            total_freq_penalty += vertex_freq[v];
+        } else {
+            normal_node_count++;
+            total_freq_normal += vertex_freq[v];
+        }
+    }
+
+    double avg_freq_penalty = penalty_node_count > 0 ? (double)total_freq_penalty / penalty_node_count : 0.0;
+    double avg_freq_normal = normal_node_count > 0 ? (double)total_freq_normal / normal_node_count : 0.0;
+
+// 多线程安全单行输出
+    // 数据列依次为: [文件名] [最终得分] [耗时] [随机种子] [迭代次数] [带惩罚点平均频率] [带惩罚点数量] [无惩罚点平均频率] [无惩罚点数量]
+    cout << file_name << " " 
+         << best_score + remove_score << " " 
+         << final_time << " " 
+         << seed << " " 
+         << current_iter << " " 
+         << avg_freq_penalty << " " 
+         << penalty_node_count << " " 
+         << avg_freq_normal << " " 
+         << normal_node_count << endl;
+    // =================================================================
+
+
+
+	//cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
 
     return 0;
 }

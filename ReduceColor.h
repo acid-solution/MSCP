@@ -62,6 +62,7 @@ void read_file(string file_name){
 void build(){
     dp_penalty.resize(vertex_count + 1); 
     color_penalty_sum.assign(COLOR_NUM + 10, vector<long>(COLOR_NUM + 10, 0));
+	vertex_freq.resize(vertex_count + 1, 0);
 
     indicator.resize(vertex_count + 1, false);
 	color_indicator.resize(vertex_count + 1, 0);
@@ -1588,7 +1589,7 @@ bool color_node_reduction(long node, long color){
     cout << "Error: Trying to color an uninitialized or removed node!" << endl;
     return false;
 	}
-
+	vertex_freq[node]++;
 
     // 使用线性查找替代索引数组
     node_score[node] = 0; // 分数重置
