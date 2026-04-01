@@ -818,11 +818,6 @@ void update_best_solution(){
 		}
         long current_color = vertex_color[node];
         long best_color = current_color;
-
-
-		long node = (start_index + i) % sz;
-		long current_color = vertex_color[node];
-		long best_color = current_color;
 		for (long c = 0; c < current_color; c++){
 			if (color_choice[node][c] == 0){
 				best_color = c;
