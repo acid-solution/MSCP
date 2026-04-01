@@ -1833,6 +1833,8 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
             long current_color = vertex_color[node];
             long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
             
+			penalty_diff = 0; 
+
             double score = (current_color - new_color) + penalty_diff + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
 
             if (score > best_color_score){
