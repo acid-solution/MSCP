@@ -20,6 +20,8 @@ int main(int argc, char* argv[]){
 	long seed = atoi(argv[3]);
 	srand(seed);
 	file_name = argv[1];
+
+	max_iter = atoi(argv[4]);
 		
 	//cout<<file_name<<endl;
 	begin_time = clock();
@@ -35,15 +37,15 @@ int main(int argc, char* argv[]){
 	// 	find_clique(v);
 	// }
 
-	tree_dp_reduction();
+	// tree_dp_reduction();
 	
 
-	// init_color(); 
-	// localsearch(cutoff);
+	init_color(); 
+	localsearch(cutoff);
 
 
-	init_color_reduction();
-	localsearch_reduction(cutoff);
+	//  init_color_reduction();
+	//  localsearch_reduction(cutoff);
 
 
 	// 将历史最优的合法解恢复到当前图中
