@@ -809,7 +809,17 @@ void swap_two_color(long color_1, long color_2){
 void update_best_solution(){
 	long sz = remaining_vertex.size();
 	long start_index = rand() % sz;
+	long current_idx = start_index;
 	for (long i = 0; i < sz; i++){//检查所有节点，尝试简单降色
+		long node = remaining_vertex[current_idx];
+		current_idx++;
+		if (current_idx >= sz) {
+			current_idx = 0;
+		}
+        long current_color = vertex_color[node];
+        long best_color = current_color;
+
+
 		long node = (start_index + i) % sz;
 		long current_color = vertex_color[node];
 		long best_color = current_color;
