@@ -486,7 +486,7 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 			if (tabu[node] > current_iter) continue;
 
 			long current_color = vertex_color[node];
-			long score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);//打分函数
+			double score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);//打分函数
 			// long score = current_color - new_color + k_conflict_color * (color_choice[node][current_color] - color_choice[node][new_color]);
 			//long score = (current_color - new_color) * (color_choice[node][current_color] - color_choice[node][new_color] + 1);
 
@@ -537,13 +537,6 @@ long compute_score(){//计算实际染色的分数
 	long sum_score = 0;
 	for (auto v : remaining_vertex){
 		sum_score += vertex_color[v] + 1;
-	}
-
-	for (long c = 1; c <= max_color; c++){
-		if (color_use_number[c] > color_use_number[c-1]){
-			swap_two_color(c-1, c);
-			return sum_score;
-		}
 	}
 	return sum_score;
 }
@@ -840,7 +833,7 @@ void update_best_solution(){
 	}
 
 	for (long i = 1; i <= max_color; i++){//颜色集合整体交换（大而顶点更多的颜色和小的交换）
-		for (long j = i; j < max_color; j++){
+		for (long j = i; j <= max_color; j++){
 			if (color_use_number[j-1] < color_use_number[j]){
 				swap_two_color(j,j-1);
 			}
@@ -2376,8 +2369,8 @@ if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 		
 		long score = 0;
         
-		//if (edge_conflict == 0) {score = cost + remaining_vertex.size();}//如果没有冲突，就计算分数，计算时间	
-		if (edge_conflict == 0) score = compute_best_score();
+		if (edge_conflict == 0) {score = cost + remaining_vertex.size();}//如果没有冲突，就计算分数，计算时间	
+		//if (edge_conflict == 0) score = compute_best_score();
 
 		best_time = clock();
 		double run_time;
