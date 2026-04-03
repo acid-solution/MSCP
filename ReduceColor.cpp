@@ -15,6 +15,8 @@ int main(int argc, char* argv[]){
 	conflict_weight = density / 3;
 	//conflict_weight = density / atof(argv[4]);
 
+	strategy_mode = 1;//0=tabu, 1=CC基础版, 2=CC+tabu混合
+
 	string file_name;
 	int cutoff = atoi(argv[2]);
 	long seed = atoi(argv[3]);
@@ -37,15 +39,15 @@ int main(int argc, char* argv[]){
 	// 	find_clique(v);
 	// }
 
-	//tree_dp_reduction();
+	tree_dp_reduction();
 	
 
 	 //init_color(); 
 	 //localsearch(cutoff);
 
 
-	init_color_reduction();
-	localsearch_reduction(cutoff);
+	 init_color_reduction();
+	 localsearch_reduction(cutoff);
 
 
 	// 将历史最优的合法解恢复到当前图中

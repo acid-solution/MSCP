@@ -103,6 +103,39 @@ inline long get_penalty(long u, long c) {
     return 0; 
 }
 
+// 策略模式：0=tabu, 1=CC基础版, 2=CC+tabu混合
+int strategy_mode = 0;
+
+// 统一的"是否应该跳过该节点"判断
+inline bool should_skip(long node) {
+    switch (strategy_mode) {
+        case 0: // 纯 Tabu
+            return tabu[node] > current_iter;
+        case 1: // 纯 Configuration Checking
+            return conf[node] == 0;
+        case 2: // CC + Tabu 混合：两个条件都满足才能选
+            return conf[node] == 0 || tabu[node] > current_iter;
+        default:
+            return false;
+    }
+}
+
+// 统一的"染色后锁定节点"操作
+inline void lock_node(long node) {
+    switch (strategy_mode) {
+        case 0: // 纯 Tabu
+            tabu[node] = current_iter + TABU_TIME;
+            break;
+        case 1: // 纯 CC：不设 tabu，只把自己 conf 置 0
+            conf[node] = 0;
+            break;
+        case 2: // 混合：两个都设
+            tabu[node] = current_iter + TABU_TIME;
+            conf[node] = 0;
+            break;
+    }
+}
+
 //动态松弛惩罚的权重，初始为 1.0（全额惩罚）
 double penalty_weight = 1.0;
 

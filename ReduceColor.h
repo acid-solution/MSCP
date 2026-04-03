@@ -482,8 +482,8 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 			long node = valid_node[index];
 			index = rand() % good_node_color[node].size();
 			long new_color = good_node_color[node][index];
-			if (conf[node] == 0) continue;
-			if (tabu[node] > current_iter) continue;
+			
+			if (should_skip(node)) continue;
 
 			long current_color = vertex_color[node];
 			double score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);//打分函数
@@ -512,8 +512,8 @@ long remove_conflict_new4(){//随机选择冲突节点，染色后tabu锁住
 		current_iter++;
 		no_impr++;
 
-		if (conf[node] == 0) return 0;
-		if (tabu[node] > current_iter) return 0;
+		if (should_skip(node)) return 0;
+		
 		new_color = max_color + 1;
 
 		if (new_color >= COLOR_NUM) 
@@ -527,7 +527,7 @@ long remove_conflict_new4(){//随机选择冲突节点，染色后tabu锁住
 		color_node(node, new_color);
 		current_iter++;
 		no_impr++;
-		tabu[node] = current_iter + TABU_TIME;
+		lock_node(node);
 	}
 
 	return 1;
@@ -589,7 +589,7 @@ void perturbation(long bms, long conflict_weight){
 	no_impr++;
 	color_node(best_node, best_color);
 	current_iter++;
-	tabu[best_node] = current_iter + TABU_TIME;
+	lock_node(best_node);
 }
 
 void perturbation_new(long bms, long conflict_weight){
@@ -700,7 +700,7 @@ void perturbation_new(long bms, long conflict_weight){
         color_node(target_node, target_color);
         no_impr++;
         current_iter++;
-        tabu[target_node] = current_iter + TABU_TIME; 
+        lock_node(target_node);
     }
 
     //仅重置本次被修改过的节点标记
@@ -726,7 +726,7 @@ void big_pertub(long pertub_num, long bms, long conflict_weight){
 			color_node(node, new_color);
 			no_impr++;
 			current_iter++;
-			tabu[node] = current_iter + TABU_TIME;
+			lock_node(node);
 			continue;
 		}
 		/*
@@ -790,7 +790,7 @@ void big_pertub(long pertub_num, long bms, long conflict_weight){
 		}
 
 		color_node(best_node, best_color);
-		tabu[best_node] = current_iter + TABU_TIME;
+		lock_node(best_node);
 		current_iter++;
 	}
 }
@@ -1207,7 +1207,7 @@ void localsearch(int cutoff){
 			color_node(best_node,best_color);//对该节点进行染色
 			current_iter++;
 			no_impr++;
-			tabu[best_node] = current_iter + TABU_TIME;
+			lock_node(best_node);
 		}
 		else{
 			remove_conflict_new4();//贪心结束，进行冲突移除
@@ -1236,144 +1236,6 @@ void localsearch(int cutoff){
 
 	}
 }
-
-void localsearch_MAB_1(int cutoff){
-	if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
-	long big_pert_num = 0;
-	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
-	if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500	
-
-
-	std::vector<double> candidate_alphas = {0.5, 1.0, 3.0, 7.0, 10.0, 20.0}; 
-    MABSolver mab(candidate_alphas);	//初始化MAB老虎机
-
-	int current_arm = mab.select_arm(); // 初始选择
-    double current_alpha_div = mab.get_alpha(current_arm);
-    conflict_weight = (density / current_alpha_div);
-    if (conflict_weight <= 0) cout<<"conflict weight error"<<endl;
-
-	const int HISTORY_SIZE = 20;            // 记录最近20个周期
-    const int CYCLE_LENGTH = vertex_count;          // 每个周期的迭代步数 (可根据图大小调整)
-    int cycle_iter_count = 0;               // 当前周期已执行步数
-
-	// [新增] 引入新的局部地形历史记录 (用 vector 替代旧的两个账本，保持轻量)
-    std::vector<long> recent_scores;
-    // 记录当前周期内见过的最好分数（初始化为最大值）
-    long current_cycle_best_score = std::numeric_limits<long>::max();
-
-    cout << "MAB Cyclic Started. Initial Alpha: " << current_alpha_div << endl;
-
-	while (current_iter < max_iter)//迭代次数
-	{
-		long best_node = -1;
-		long best_color = -1;
-		long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
-		if (x == 1 && best_node != -1){		//如果能找到好的节点，进行贪心
-			color_node(best_node,best_color);//对该节点进行染色
-			current_iter++;
-			no_impr++;
-			tabu[best_node] = current_iter + TABU_TIME;
-		}
-		else{
-			remove_conflict_new4();//贪心结束，进行冲突移除
-		}
-		
-		long score = 0;
-		if (edge_conflict == 0) {
-			score = compute_best_score();//如果没有冲突，就计算分数，计算时间
-
-			if (score < current_cycle_best_score) {
-                current_cycle_best_score = score;
-            }
-		}
-		best_time = clock();
-		double run_time;
-		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
-		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解         
-			update_best_solution();//更新最优解
-			if (!verify_solution()){//验证解的正确性
-				cout << "solution error" << endl;
-				getchar();
-			}
-			final_time = run_time;//记录最终时间
-			no_impr = 0;
-		}
-
-		// [新增] MAB 周期结算逻辑 
-        cycle_iter_count++;
-        if (cycle_iter_count >= CYCLE_LENGTH) {
-
-			double reward = 0.0;
-
-			if (current_cycle_best_score < std::numeric_limits<long>::max()) {
-				if (recent_scores.empty()) {
-                    // 历史记录为空（刚开始），既然拿到有效解，给满分鼓励
-                    reward = 1.0; 
-                } else {
-                    // 1. 提取当前局部地形的最差和最好表现
-                    long local_worst = current_cycle_best_score;
-                    long local_best  = current_cycle_best_score;
-                    for (long s : recent_scores) {
-                        if (s > local_worst) local_worst = s;
-                        if (s < local_best)  local_best  = s;
-                    }
-					// 2. 核心评价公式：你在近期的泥潭里排第几？
-                    if (local_worst == local_best) {
-                        // 防御机制：近期分数全部一样（完全卡死）
-                        reward = (current_cycle_best_score < local_best) ? 1.0 : 0.5;
-                    } else {
-                        // 线性插值归一化 (越接近 local_best 分数越高)
-                        reward = (double)(local_worst - current_cycle_best_score) / (local_worst - local_best);
-                    }
-                    
-                    // 3. 双重保险 (防止破纪录导致 > 1.0，或极端情况 < 0.0)
-                    if (reward > 1.0) reward = 1.0;
-                    if (reward < 0.0) reward = 0.0;
-                }
-				// 4. 更新滑动窗口 (踢出最老的，放入最新的)
-                recent_scores.push_back(current_cycle_best_score);
-                if (recent_scores.size() > HISTORY_SIZE) {
-                    recent_scores.erase(recent_scores.begin()); 
-                }
-            } else {
-                // 如果本周期颗粒无收（完全在不可行区域乱转），给 0 分
-                reward = 0.0; 
-            }
-            // 4. 更新 MAB 权重，选择下一个周期的参数
-            mab.update(current_arm, reward);
-             // [修改] 因为删除了 avg_history，稍微调整了终端打印信息，更关注当前得分和拿到的奖励
-            cout << "Cycle End. Alpha: " << current_alpha_div 
-                 << " score: " << current_cycle_best_score 
-                 << " reward: " << reward;
-            current_arm = mab.select_arm();
-            current_alpha_div = mab.get_alpha(current_arm);
-			 cout << " Next Alpha: " << current_alpha_div << endl;   
-            // 6. 应用新参数
-            conflict_weight = (density / current_alpha_div);
-            if (conflict_weight <= 0) conflict_weight = 1;
-            // 7. 重置周期计数器
-            cycle_iter_count = 0;
-            current_cycle_best_score = std::numeric_limits<long>::max();
-        }
-
-
-		if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
-			big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
-			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
-			no_impr = 0;
-			big_pert_num++;
-
-			// [新增] 大扰动会彻底摧毁当前的地形结构！
-            // 必须强制清空本周期的累计数据，防止大扰动造成的“分数变差”让当前的 Alpha 蒙冤背锅。
-            cycle_iter_count = 0;
-            current_cycle_best_score = std::numeric_limits<long>::max();
-		}
-		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
-
-		if (run_time > cutoff) return;
-	}
-}
-
 
 void tree_dp_reduction() {
     remove_score = 0; // 被剥离节点的总代价（分数）累加器
@@ -1837,8 +1699,7 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
             index = rand() % good_node_color[node].size();
             long new_color = good_node_color[node][index];
             
-            if (conf[node] == 0) continue;
-            if (tabu[node] > current_iter) continue;
+            if (should_skip(node)) continue;
 
             long current_color = vertex_color[node];
             long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
@@ -1901,7 +1762,7 @@ void perturbation_reduction(long bms, long conflict_weight){
 	no_impr++;
 	color_node_reduction(best_node, best_color);
 	current_iter++;
-	tabu[best_node] = current_iter + TABU_TIME;
+	lock_node(best_node);
 }
 
 long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu锁住
@@ -1913,8 +1774,7 @@ long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu
 		current_iter++;
 		no_impr++;
 
-		if (conf[node] == 0) return 0;
-		if (tabu[node] > current_iter) return 0;
+		if (should_skip(node)) return 0;
 
 		new_color = max_color + 1;
 		if (new_color >= COLOR_NUM) {
@@ -1933,7 +1793,7 @@ long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu
 		color_node_reduction(node, new_color);
 		current_iter++;
 		no_impr++;
-		tabu[node] = current_iter + TABU_TIME;
+		lock_node(node);
 	}
 
 	return 1;
@@ -2048,7 +1908,7 @@ void perturbation_new_reduction(long bms, long conflict_weight){
         color_node_reduction(target_node, target_color);
         no_impr++;
         current_iter++;
-        tabu[target_node] = current_iter + TABU_TIME; 
+        lock_node(target_node);
     }
 
     //仅重置本次被修改过的节点标记
@@ -2074,7 +1934,7 @@ void big_pertub_reduction(long pertub_num, long bms, long conflict_weight){
 			color_node_reduction(node, new_color);
 			no_impr++;
 			current_iter++;
-			tabu[node] = current_iter + TABU_TIME;
+			lock_node(node);
 			continue;
 		}
 		/*
@@ -2144,7 +2004,7 @@ void big_pertub_reduction(long pertub_num, long bms, long conflict_weight){
 		}
 
 		color_node_reduction(best_node, best_color);
-		tabu[best_node] = current_iter + TABU_TIME;
+		lock_node(best_node);
 		current_iter++;
 	}
 }
@@ -2361,7 +2221,7 @@ if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 			color_node_reduction(best_node,best_color);//对该节点进行染色
 			current_iter++;
 			no_impr++;
-			tabu[best_node] = current_iter + TABU_TIME;
+			lock_node(best_node);
 		}
 		else{
 			remove_conflict_new4_reduction();//贪心结束，进行冲突移除
