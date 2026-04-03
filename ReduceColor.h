@@ -284,21 +284,33 @@ void init_color(){
 		neig_color.resize(color_threshold,0);//初始化邻居颜色记录数组
 		for (auto u : adjacency_list[v]){	//遍历节点 v 的所有邻居 u
 			if (vertex_color[u] != -1){		//如果邻居 u 已经被染色
+				if (vertex_color[u] >= neig_color.size()) {
+					neig_color.resize(vertex_color[u] + 2, 0); 
+				}
 				neig_color[vertex_color[u]] = 1;	//将该颜色标记为已被使用
 			}
 		}
 
 		long color = 0;
-		for (long i = 0; i < color_threshold; i++){	//寻找第一个未被使用的颜色
+		for (long i = 0; i < neig_color.size(); i++){	//寻找第一个未被使用的颜色
 			if (neig_color[i] == 0) {
 				color = i;
 				break;
 			}
 		}
 
+		if (neig_color[color] == 1) {
+			color = neig_color.size();
+		}
+
 		if (color > max_color) max_color = color;	//更新最大颜色编号
+
 		vertex_color[v] = color;					//为节点 v 分配颜色
 		cost += color;								//更新当前解的花费
+
+		if ((size_t)color >= color_use_number.size()) {
+			color_use_number.resize(color + 10, 0); 
+		}
 		color_use_number[color]++;					//维护颜色使用数量	
 	}
 
@@ -1837,8 +1849,6 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
 
             long current_color = vertex_color[node];
             long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
-            
-			penalty_diff = 0; 
 
             double score = (current_color - new_color) + penalty_diff + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
 
@@ -1914,15 +1924,17 @@ long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu
 		if (tabu[node] > current_iter) return 0;
 
 		new_color = max_color + 1;
-		bool found_zero_conflict = false;
-		// 优先在当前已使用的颜色范围内找一个零冲突的
-		for (long i = 0; i <= max_color; i++) {
-			// 加上安全判断，防止 color_choice 越界
-			if (i < color_choice[node].size() && color_choice[node][i] == 0) { 
-				new_color = i; 
-				found_zero_conflict = true;
-				break; 
+		if (new_color >= COLOR_NUM) {
+			for (long i = 0; i < COLOR_NUM; i++) {
+				// 加安全判断
+				if (i < color_choice[node].size() && color_choice[node][i] == 0) { 
+					new_color = i; 
+					break; 
+				} 
 			}
+		}
+		if (new_color >= COLOR_NUM) {
+			new_color = new_color % COLOR_NUM;
 		}
 		
 		color_node_reduction(node, new_color);
@@ -2156,21 +2168,30 @@ void init_color_reduction(){
 		neig_color.resize(color_threshold,0);//初始化邻居颜色记录数组
 		for (auto u : adjacency_list[v]){	//遍历节点 v 的所有邻居 u
 			if (vertex_color[u] != -1){		//如果邻居 u 已经被染色
+				if (vertex_color[u] >= neig_color.size()) {
+					neig_color.resize(vertex_color[u] + 2, 0); 
+				}
 				neig_color[vertex_color[u]] = 1;	//将该颜色标记为已被使用
 			}
 		}
 
 		long color = 0;
-		for (long i = 0; i < color_threshold; i++){	//寻找第一个未被使用的颜色
+		for (long i = 0; i < neig_color.size(); i++){	//寻找第一个未被使用的颜色
 			if (neig_color[i] == 0) {
 				color = i;
 				break;
 			}
 		}
+		if (neig_color[color] == 1) {
+			color = neig_color.size();
+		}
 
 		if (color > max_color) max_color = color;	//更新最大颜色编号
 		vertex_color[v] = color;					//为节点 v 分配颜色
 		cost += color + get_penalty(v, color);								//更新当前解的花费
+		if ((size_t)color >= color_use_number.size()) {
+			color_use_number.resize(color + 10, 0); 
+		}
 		color_use_number[color]++;					//维护颜色使用数量	
 	}
 
@@ -2355,8 +2376,8 @@ if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 		
 		long score = 0;
         
-		if (edge_conflict == 0) {score = cost + remaining_vertex.size();}//如果没有冲突，就计算分数，计算时间	
-		
+		//if (edge_conflict == 0) {score = cost + remaining_vertex.size();}//如果没有冲突，就计算分数，计算时间	
+		if (edge_conflict == 0) score = compute_best_score();
 
 		best_time = clock();
 		double run_time;
