@@ -476,15 +476,23 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 	long best_color_score = -1;
 
 	if (!valid_node.empty()){
-		for (long i = 0; i < bms; i++){
-			//choose a rand node and rand color
-			long index = rand() % valid_node.size();
-			long node = valid_node[index];
-			index = rand() % good_node_color[node].size();
-			long new_color = good_node_color[node][index];
-			
-			if (should_skip(node)) continue;
-
+		long fail_count = 0;                          // 【改动】新增：记录跳过次数
+		long max_fail = bms * 2;                      // 【改动】新增：防死循环上限
+		for (long i = 0; i < bms; ){                  // 【改动】去掉 i++，改为手动递增
+				if (fail_count >= max_fail) break;        // 【改动】新增：达到上限就退出
+				//choose a rand node and rand color
+				long index = rand() % valid_node.size();
+				long node = valid_node[index];
+				index = rand() % good_node_color[node].size();
+				long new_color = good_node_color[node][index];
+				
+				// 【改动】原来是 if (should_skip(node)) continue;
+				if (should_skip(node)) {
+					fail_count++;                         // 【改动】跳过时只增加失败计数
+					continue;                             // 【改动】不消耗 i 的名额
+				}
+				i++;                                      // 【改动】有效采样才消耗名额
+				
 			long current_color = vertex_color[node];
 			double score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);//打分函数
 			// long score = current_color - new_color + k_conflict_color * (color_choice[node][current_color] - color_choice[node][new_color]);
@@ -505,14 +513,21 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 
 long remove_conflict_new4(){//随机选择冲突节点，染色后tabu锁住
 	if (edge_conflict > 0){
-		long index = rand() % conflict_node_queue.size();
-		long node = conflict_node_queue[index];
-		//long current_color = vertex_color[node];
+        long node = -1;
+        long max_retry = conflict_node_queue.size();  // 【改动】最多重试队列大小次
+        for (long retry = 0; retry < max_retry; retry++) {
+            long index = rand() % conflict_node_queue.size();
+            long candidate = conflict_node_queue[index];
+            if (!should_skip(candidate)) {
+                node = candidate;
+                break;
+            }
+        }
+        if (node == -1) return 0;                     // 【改动】全部锁住才真正放弃
+
 		long new_color = -1;
 		current_iter++;
 		no_impr++;
-
-		if (should_skip(node)) return 0;
 		
 		new_color = max_color + 1;
 
@@ -1472,7 +1487,7 @@ bool color_node_reduction(long node, long color){
     long old_conflict = 0;
     long new_conflict = 0;
     long old_color = vertex_color[node];
-    
+
     //维护swap要用的数据结构
     long limit = dp_penalty[node].size(); 
     for (long target_c = 0; target_c < limit; target_c++) {
@@ -1693,13 +1708,22 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
     double best_color_score = -1; 
 
     if (!valid_node.empty()){
-        for (long i = 0; i < bms; i++){
-            long index = rand() % valid_node.size();
-            long node = valid_node[index];
-            index = rand() % good_node_color[node].size();
-            long new_color = good_node_color[node][index];
-            
-            if (should_skip(node)) continue;
+		long fail_count = 0;                          // 【改动】新增：记录跳过次数
+		long max_fail = bms * 2;                      // 【改动】新增：防死循环上限
+		for (long i = 0; i < bms; ){                  // 【改动】去掉 i++，改为手动递增
+			if (fail_count >= max_fail) break;        // 【改动】新增：达到上限就退出
+			//choose a rand node and rand color
+			long index = rand() % valid_node.size();
+			long node = valid_node[index];
+			index = rand() % good_node_color[node].size();
+			long new_color = good_node_color[node][index];
+			
+			// 【改动】原来是 if (should_skip(node)) continue;
+			if (should_skip(node)) {
+				fail_count++;                         // 【改动】跳过时只增加失败计数
+				continue;                             // 【改动】不消耗 i 的名额
+			}
+			i++;                                      // 【改动】有效采样才消耗名额
 
             long current_color = vertex_color[node];
             long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
@@ -1767,14 +1791,22 @@ void perturbation_reduction(long bms, long conflict_weight){
 
 long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu锁住
 	if (edge_conflict > 0){
-		long index = rand() % conflict_node_queue.size();
-		long node = conflict_node_queue[index];
-		//long current_color = vertex_color[node];
+        long node = -1;
+        long max_retry = conflict_node_queue.size();  // 【改动】最多重试队列大小次
+        for (long retry = 0; retry < max_retry; retry++) {
+            long index = rand() % conflict_node_queue.size();
+            long candidate = conflict_node_queue[index];
+            if (!should_skip(candidate)) {
+                node = candidate;
+                break;
+            }
+        }
+        if (node == -1) return 0;                     // 【改动】全部锁住才真正放弃
+
 		long new_color = -1;
 		current_iter++;
 		no_impr++;
 
-		if (should_skip(node)) return 0;
 
 		new_color = max_color + 1;
 		if (new_color >= COLOR_NUM) {
