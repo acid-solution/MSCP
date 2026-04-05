@@ -1,6 +1,3 @@
-
-
-
 #include"ReduceColor.h"
 
 int main(int argc, char* argv[]){
@@ -15,7 +12,7 @@ int main(int argc, char* argv[]){
 	conflict_weight = density / 3;
 	//conflict_weight = density / atof(argv[4]);
 
-	strategy_mode = 1;//0=tabu, 1=CC基础版, 2=CC+tabu混合
+	strategy_mode = 0;//0=tabu, 1=CC基础版, 2=CC+tabu混合, 3=CICC
 
 	string file_name;
 	int cutoff = atoi(argv[2]);

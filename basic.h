@@ -11,9 +11,8 @@
 #include <tuple>
 
 #include "util.h"
-#include "MABSolver.h"
 
-#define COLOR_NUM 1000
+#define COLOR_NUM 2000
 
 #define TABU_TIME 3
 
@@ -92,10 +91,10 @@ long max_no_impr = max_no_impr_basic;
 
 
 
-// 新增：用于存储 DP 惩罚和森林常数
+//用于存储 DP 惩罚和森林常数
 vector<vector<long>> dp_penalty; 
 long forest_constant_cost = 0;
-// 新增：安全查询函数（如果颜色超出数组长度，说明该颜色非常大，惩罚必定为 0）
+//安全查询函数（如果颜色超出数组长度，说明该颜色非常大，惩罚必定为 0）
 inline long get_penalty(long u, long c) {
     if (c < dp_penalty[u].size()) {
         return dp_penalty[u][c];
@@ -103,9 +102,38 @@ inline long get_penalty(long u, long c) {
     return 0; 
 }
 
-// 策略模式：0=tabu, 1=CC基础版, 2=CC+tabu混合
+// 策略模式：0=tabu, 1=CC基础版, 2=CC+tabu混合，3=cicc
 int strategy_mode = 0;
+vector<vector<int>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
+inline int get_cicc(long v, long c) {
+    if (c < (long)cicc[v].size()) return cicc[v][c];
+    return 0; // 超出范围说明从未被设过，默认允许
+}
 
+inline void set_cicc(long v, long c, int val) {
+    if (c >= (long)cicc[v].size()) {
+        cicc[v].resize(c + 1, 0);
+    }
+    cicc[v][c] = val;
+}
+
+inline void dec_cicc(long v, long c) {
+    if (c < (long)cicc[v].size()) {
+        cicc[v][c]--;
+    }
+    // 超出范围的本来就是0，减了变-1也无所谓，<=0都是允许
+}
+
+inline void reset_cicc() {
+    for (auto& vec : cicc) {
+        // 使用 assign 快速将已有容量的元素全部置 0，不清空容量以避免后续反复 resize
+        vec.assign(vec.size(), 0); 
+    }
+}
+
+inline bool should_skip_cicc(long node, long target_color) {
+    return get_cicc(node, target_color) > 0;
+}
 // 统一的"是否应该跳过该节点"判断
 inline bool should_skip(long node) {
     switch (strategy_mode) {
@@ -120,22 +148,22 @@ inline bool should_skip(long node) {
     }
 }
 
-// 统一的"染色后锁定节点"操作
 inline void lock_node(long node) {
     switch (strategy_mode) {
-        case 0: // 纯 Tabu
+        case 0:
             tabu[node] = current_iter + TABU_TIME;
             break;
-        case 1: // 纯 CC：不设 tabu，只把自己 conf 置 0
+        case 1:
             conf[node] = 0;
             break;
-        case 2: // 混合：两个都设
+        case 2:
             tabu[node] = current_iter + TABU_TIME;
             conf[node] = 0;
+            break;
+        case 3: // CICC 模式：锁定逻辑已经在 color_node_reduction 中完成
             break;
     }
 }
-
 //动态松弛惩罚的权重，初始为 1.0（全额惩罚）
 double penalty_weight = 1.0;
 
