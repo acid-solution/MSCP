@@ -1,4 +1,4 @@
-#include"ReduceColor.h"
+#include"LS.h"
 
 int main(int argc, char* argv[]){
 
@@ -11,39 +11,29 @@ int main(int argc, char* argv[]){
 	}
 	conflict_weight = density / 3;
 
-	strategy_mode = 0;//0=tabu, 1=CC基础版, 2=CC+tabu混合, 3=CICC
-	reduction_mode = 1;//0=原版约简，1=dp约简
-	init_mode= 0;//0=原版初始化，1=reduction初始化
-	localsearch_mode = 0;//0=原版局部搜索，1=reduction局部搜索
+	//0=tabu, 1=CC基础版, 2=CC+tabu混合, 3=CICC
+	strategy_mode = 0;
+	//0=不带约简，1=dp约简，2=原版约简
+	reduction_mode = 0;
+	//0=原版初始化，1=reduction初始化
+	init_mode= 0;
+	//0=原版局部搜索，1=reduction局部搜索
+	localsearch_mode = 0;
 
-	string file_name;
+	string file_name= argv[1];
 	int cutoff = atoi(argv[2]);
 	long seed = atoi(argv[3]);
-	srand(seed);
-	file_name = argv[1];
 	//max_iter = atoi(argv[4]);
+
+	srand(seed);
 
 	begin_time = clock();
 	read_file(file_name);
-
 	build();
 
-	// if (vertex_count > 2000) //顶点大于2000时才进行约简
-	// for (auto v : remaining_vertex){//从每个点开始寻找团
-	// 	if (v != 0)
-	// 	find_clique(v);
-	// }
-
-	tree_dp_reduction();
-	
-
-	 //init_color(); 
-	 //localsearch(cutoff);
-
-
-	 init_color_reduction();
-	 localsearch_reduction(cutoff);
-
+	reduction(reduction_mode);
+	init_color(init_mode);
+	localsearch(localsearch_mode, cutoff);
 
 	// 将历史最优的合法解恢复到当前图中
     for (auto v : remaining_vertex){

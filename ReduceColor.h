@@ -1,6 +1,6 @@
 #pragma once
 #include "basic.h"
-
+#include "util.h"
 
 void read_file(string file_name){
 	ifstream in_file(file_name);
@@ -218,7 +218,7 @@ bool find_clique(long vv){
 
 }
 
-void init_color(){
+void init_color_old(){
 	//init vertex with random color
 	long remainnign_size = remaining_vertex.size();
 	long color_threshold = COLOR_NUM;
@@ -792,7 +792,7 @@ bool color_node(long node, long color){
     return true;
 }
 
-void localsearch(int cutoff){
+void localsearch_old(int cutoff){
 	if (conflict_weight == 0) conflict_weight = 1;		//避免冲突权重为0
 	long big_pert_num = 0;
 	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数

@@ -1,4 +1,5 @@
 #pragma once
+#include "basic.h"
 #include <cmath>
 
 static double luby(double y, int x){

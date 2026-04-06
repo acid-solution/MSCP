@@ -10,7 +10,6 @@
 #include <cmath>
 #include <tuple>
 
-#include "util.h"
 
 #define COLOR_NUM 2000
 
@@ -21,12 +20,11 @@ using namespace std;
 bool remove_clique(long v);
 bool color_node(long node, long color);
 long compute_score();
-void init_color();
 void swap_two_color(long color1, long color2);
 bool find_clique(long v);
 void update_best_solution();
 bool verify_solution();
-
+ 
 bool color_node_reduction(long node, long color);
 void build_reduction();
 long compute_score_reduction();
@@ -236,7 +234,3 @@ Vertex_vec_with_index remaining_vertex;
 Vertex_vec_with_index working_vertex;
 Vertex_vec_with_index conflict_node_queue;
 Vertex_vec_with_index valid_node;
-
-
-
-long max_size = 0;

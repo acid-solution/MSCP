@@ -26,7 +26,7 @@ endif
 all: $(TARGET)
 
 # 编译命令
-$(TARGET): $(SRC) ReduceColor.h basic.h util.h MABSolver.h
+$(TARGET): $(SRC) ReduceColor.h basic.h util.h LS.h
 	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET)
 
 # 清理命令
