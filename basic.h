@@ -74,7 +74,6 @@ long remove_score = 0;
 long remove_num;
 double density;
 
-long connect[5000][5000];
 
 clock_t begin_time, best_time;
 long max_iter = 500000000000;
@@ -91,6 +90,8 @@ long max_no_impr = max_no_impr_basic;
 
 
 
+
+
 //用于存储 DP 惩罚和森林常数
 vector<vector<long>> dp_penalty; 
 long forest_constant_cost = 0;
@@ -103,7 +104,12 @@ inline long get_penalty(long u, long c) {
 }
 
 // 策略模式：0=tabu, 1=CC基础版, 2=CC+tabu混合，3=cicc
-int strategy_mode = 0;
+long strategy_mode = 0;
+long reduction_mode = 0;
+long init_mode = 0;
+long localsearch_mode = 0;
+
+
 vector<vector<int>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
 inline int get_cicc(long v, long c) {
     if (c < (long)cicc[v].size()) return cicc[v][c];
