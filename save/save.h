@@ -358,8 +358,7 @@ void perturbation_new(long bms, long conflict_weight){
         color_node(target_node, target_color);
         no_impr++;
         current_iter++;
-        lock_node(target_node);
-    }
+       }
 
     //仅重置本次被修改过的节点标记
     for (auto v : visited_history) {
@@ -476,8 +475,7 @@ void perturbation_new_reduction(long bms, long conflict_weight){
         color_node_reduction(target_node, target_color);
         no_impr++;
         current_iter++;
-        lock_node(target_node);
-    }
+       }
 
     //仅重置本次被修改过的节点标记
     for (auto v : visited_history) {

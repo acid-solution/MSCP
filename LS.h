@@ -39,3 +39,17 @@ void localsearch(long mode, long cutoff){
         exit(1);
     }
 }
+
+void print_best_score(){
+    // 将历史最优的合法解恢复到当前图中
+    for (auto v : remaining_vertex){
+        vertex_color[v] = best_solution[v];
+    }
+	best_score = compute_score_reduction(); // 计算最终得分
+    if (!verify_solution()){//验证解的正确性
+        cout << "solution error" << endl;
+        exit(0);
+    }
+	
+	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
+}

@@ -1,30 +1,30 @@
 #pragma once
 #include "basic.h"
 #include <cmath>
-
+ 
 static double luby(double y, int x){
-
+ 
     // Find the finite subsequence that contains index 'x', and the
     // size of that subsequence:
     int size, seq;
     for (size = 1, seq = 0; size < x+1; seq++, size = 2*size+1);
-
+ 
     while (size-1 != x){
         size = (size-1)>>1;
         seq--;
         x = x % size;
     }
-
+ 
     return pow(y, seq);
 }
-
+ 
 bool cmp_by_edgeout(long x, long y){
 	return x > y;
 }
-
+ 
 bool remove_clique(long v){//删除节点 v 和其相关边
 	//vector<long> &clique = *all_clique.rbegin();
-
+ 
         for(auto u : temp_adjacency_list[v]){	//删除节点v在temp_adjacency_list中所有邻居节点u与v的连接
 			for (vector<long>::size_type i = 0; i < temp_adjacency_list[u].size(); ++i) {
 				if (temp_adjacency_list[u][i] == v) {								//找到邻居节点 u 的邻接表中与 v 相连的边
@@ -37,7 +37,7 @@ bool remove_clique(long v){//删除节点 v 和其相关边
         remaining_vertex.remove(v);//从剩余节点列表中移除节点 v
     return true;
 }
-
+ 
 bool verify_solution(){
 	for (auto v : remaining_vertex){
 		for (auto u : temp_adjacency_list[v]){
@@ -49,3 +49,86 @@ bool verify_solution(){
 	return true;
 }
 
+
+inline bool is_lock(long node, long target_color){
+    switch (strategy_mode){
+        case 0: // Tabu-only
+            return tabu[node] > current_iter;
+        case 1: // CC-only
+            return (conf[node] == 0);
+        case 2: // CC + Tabu
+            return (tabu[node] > current_iter) || (conf[node] == 0);
+        case 3: // Pure CICC
+            return (target_color < (long)cicc[node].size()) && (cicc[node][target_color] > 0);
+        default:
+            return false;
+    }
+}
+
+inline void lock_unlock(long node, long old_color, long target_color){
+    // Tabu：节点级短期记忆（在模式 0 或 2 生效）
+    if (strategy_mode == 0 || strategy_mode == 2){
+        tabu[node] = current_iter + TABU_TIME;
+    }
+
+    // CC：锁定自身，解禁邻居（简化版）并设置冷却（在模式 1 或 2 生效）
+    if (strategy_mode == 1 || strategy_mode == 2){
+        conf[node] = 0;
+        for (auto v : temp_adjacency_list[node]){
+            conf[v] = 1;
+        }
+    }
+
+    // CICC：颜色对门槛（在模式 3 生效）
+    if (strategy_mode == 3){
+        if (old_color >= (long)cicc[node].size()) {
+            cicc[node].resize(old_color + 1, 0);
+        }
+        cicc[node][old_color] = color_choice[node][old_color];
+        for (auto v : temp_adjacency_list[node]){
+            if (old_color < (long)cicc[v].size() && cicc[v][old_color] > 0) {
+                cicc[v][old_color]--;
+            }
+        }
+        
+    }
+    (void)target_color; // 暂未使用
+}
+
+inline void unlock_all_vertices() {
+    switch (strategy_mode) {
+        case 0: // Tabu-only
+            for (size_t v = 0; v < tabu.size(); ++v) {
+                tabu[v] = 0;
+            }
+            break;
+        case 1: // CC-only
+            for (size_t v = 0; v < conf.size(); ++v) {
+                conf[v] = 1;
+            }
+            break;
+        case 2: // CC + Tabu
+            for (size_t v = 0; v < tabu.size(); ++v) {
+                tabu[v] = 0;
+            }
+            for (size_t v = 0; v < conf.size(); ++v) {
+                conf[v] = 1;
+            }
+            break;
+        case 3: // Pure CICC
+            for (auto& vec : cicc) {
+                vec.assign(vec.size(), 0);
+            }
+            break;
+    }
+}
+
+
+inline long get_penalty(long u, long c) {
+    if (c < dp_penalty[u].size()) {
+        return dp_penalty[u][c];
+    }
+    return 0;
+}
+
+ 
