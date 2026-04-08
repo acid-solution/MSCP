@@ -67,7 +67,7 @@ void read_file(string file_name){
 void build(){
 	cicc.resize(vertex_count + 1);
     dp_penalty.resize(vertex_count + 1); 
-    color_penalty_sum.assign(COLOR_NUM + 10, vector<short>(COLOR_NUM + 10, 0));
+    color_penalty_sum.assign(COLOR_NUM + 10, vector<long>(COLOR_NUM + 10, 0));
 	vertex_freq.resize(vertex_count + 1, 0);
 
     indicator.resize(vertex_count + 1, false);

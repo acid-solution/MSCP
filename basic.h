@@ -30,8 +30,8 @@ bool color_node_reduction(long node, long color, bool lock_it = true);
 long compute_score_reduction();
 
 
-vector<vector<short>> adjacency_list;//存储原始的、完整的图结构
-vector<vector<short>> temp_adjacency_list;//存储约简后的图结构
+vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
+vector<vector<long>> temp_adjacency_list;//存储约简后的图结构
 vector<vector<short>> color_choice; //color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
 vector<long> tabu;
 vector<bool> indicator; //在 find_clique 中使用，用于O(1)查询
@@ -45,7 +45,7 @@ vector<long> conflict_vertex_in_color; //all the conflict node
 vector<long> best_solution;
 
 vector<vector<short>> good_node_color; //对于每个节点 v，good_node_color[v] 维护了一个候选颜色列表。这个列表里的颜色通常是“好移动”的目标颜色
-vector<vector<short>> color_penalty_sum;
+vector<vector<long>> color_penalty_sum;
 
 string file_name;
 long cutoff;
@@ -82,7 +82,7 @@ long max_no_impr = max_no_impr_basic;
 
 
 //用于存储 DP 惩罚和森林常数
-vector<vector<short>> dp_penalty;
+vector<vector<long>> dp_penalty;
 
 // 策略模式：0=tabu, 1=CC基础版, 2=CC+tabu混合，3=cicc
 long strategy_mode = 0;

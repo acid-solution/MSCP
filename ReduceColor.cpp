@@ -4,13 +4,13 @@
 int main(int argc, char* argv[]){
 
 	//0=tabu, 1=CC基础版, 2=CC+tabu混合, 3=CICC
-	strategy_mode = 3;
-	//0=不带约简，1=dp约简，2=原版约简
-	reduction_mode = 0;
+	strategy_mode = 0;
+	//0=不带约简，1=原版约简，2=dp约简
+	reduction_mode = 2;
 	//0=原版初始化，1=reduction初始化
-	init_mode= 0;
+	init_mode= 1;
 	//0=原版局部搜索，1=reduction局部搜索
-	localsearch_mode = 0;
+	localsearch_mode = 1;
 
 	file_name= argv[1];
 	cutoff = atoi(argv[2]);
