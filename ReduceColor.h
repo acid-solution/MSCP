@@ -895,7 +895,8 @@ void update_best_solution_reduction(){
         long limit_color = std::min((long)eff_curr_cost, max_color + 2);
         
         for (long c = 0; c < limit_color; c++){
-            if (color_choice[node][c] == 0){
+            short conf_c = (c < (long)color_choice[node].size()) ? color_choice[node][c] : 0;
+            if (conf_c == 0){
                 long eff_new_cost = c + get_penalty(node, c);
                 if (eff_new_cost < min_eff_cost){
                     min_eff_cost = eff_new_cost;
