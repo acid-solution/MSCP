@@ -80,19 +80,23 @@ inline void lock_unlock(long node, long old_color, long target_color){
     }
 
     // CICC：颜色对门槛（在模式 3 生效）
-    if (strategy_mode == 3){
-        if (old_color >= (long)cicc[node].size()) {
-            cicc[node].resize(old_color + 1, 0);
-        }
-        cicc[node][old_color] = color_choice[node][old_color];
-        for (auto v : temp_adjacency_list[node]){
-            if (old_color < (long)cicc[v].size() && cicc[v][old_color] > 0) {
-                cicc[v][old_color]--;
-            }
+    if (strategy_mode == 3) {
+        long need = std::max(old_color, target_color) + 1;
+        
+        // 只在真的不够时扩容，且一次多留 50% 缓冲
+        if ((long)cicc[node].size() < need) {
+            cicc[node].resize(need * 3 / 2, 0);
         }
         
+        cicc[node][old_color] = color_choice[node][old_color];
+        
+        for (auto v : temp_adjacency_list[node]) {
+            if ((long)cicc[v].size() < need)
+                cicc[v].resize(need * 3 / 2, 0);
+            if (cicc[v][old_color] > 0)
+                cicc[v][old_color]--;
+        }
     }
-    (void)target_color; // 暂未使用
 }
 
 inline void unlock_all_vertices() {
