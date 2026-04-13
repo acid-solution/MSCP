@@ -135,4 +135,13 @@ inline long get_penalty(long u, long c) {
     return 0;
 }
 
- 
+inline void ensure_color_penalty_sum_size(long max_color_needed, long max_target_c) {
+    long required_size = std::max(max_color_needed, max_target_c) + 10;
+    if (required_size > color_penalty_sum.size()) {
+        long old_size = color_penalty_sum.size();
+        color_penalty_sum.resize(required_size);
+        for (long i = 0; i < required_size; ++i) {
+            color_penalty_sum[i].resize(required_size, 0);
+        }
+    }
+} 

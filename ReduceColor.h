@@ -912,10 +912,7 @@ void update_best_solution_reduction(){
     // 2. 全局颜色集合交换
     for (long i = 1; i <= max_color; i++){
         for (long j = i; j <= max_color; j++){
-            if (i != j) {
-                // 不再依赖失效的人数统计，让 swap 函数自己去算 DP 账本
                 swap_two_color_reduction(j, i - 1);
-            }
         }
     }
 
@@ -947,6 +944,8 @@ bool color_node_reduction(long node, long color, bool lock_it){
 
     //维护swap要用的数据结构
     long limit = dp_penalty[node].size(); 
+	ensure_color_penalty_sum_size(std::max(old_color, color), limit);
+
     for (long target_c = 0; target_c < limit; target_c++) {
         long p = get_penalty(node, target_c);
         if (p > 0) {
@@ -1380,6 +1379,9 @@ void init_color_reduction(){
 	// 【修复】初始化 color_penalty_sum，与初始染色状态同步
 	for (auto v : remaining_vertex) {
 		long c_src = vertex_color[v];
+		long limit = dp_penalty[v].size();
+        ensure_color_penalty_sum_size(c_src, limit); // 加入安全防线
+
 		for (long target_c = 0; target_c < (long)dp_penalty[v].size(); target_c++) {
 			long p = get_penalty(v, target_c);
 			if (p > 0) {
