@@ -518,46 +518,6 @@ void swap_two_color(long color_1, long color_2){
 	}
 }
 
-void update_best_solution(){
-	long sz = remaining_vertex.size();
-	long start_index = rand() % sz;
-	long current_idx = start_index;
-	for (long i = 0; i < sz; i++){//检查所有节点，尝试简单降色
-		long node = remaining_vertex[current_idx];
-		current_idx++;
-		if (current_idx >= sz) {
-			current_idx = 0;
-		}
-        long current_color = vertex_color[node];
-        long best_color = current_color;
-		for (long c = 0; c < current_color; c++){
-			if (color_choice[node][c] == 0){
-				best_color = c;
-				break;
-			}
-		}
-		if (best_color != current_color) color_node(node, best_color, false);
-	}
-
-	push_down_move();
-
-	for (long i = 1; i <= max_color; i++){//颜色集合整体交换（大而顶点更多的颜色和小的交换）
-		for (long j = i; j <= max_color; j++){
-			if (color_use_number[j-1] < color_use_number[j]){
-				swap_two_color(j,j-1);
-			}
-		}
-	}
-
-	long score = compute_score();//计算当前解的评分
-	if (score < best_score){//更新最优解和最优评分
-		best_score = score;//更新最优评分
-		for (auto v : remaining_vertex){
-			best_solution[v] = vertex_color[v];//保存当前解为最优解
-		}
-	}
-}
-
 void push_down_move() {
     long sz = remaining_vertex.size();
     if (sz == 0) return;
@@ -622,6 +582,46 @@ void push_down_move() {
             }
         }
     }
+}
+
+void update_best_solution(){
+	long sz = remaining_vertex.size();
+	long start_index = rand() % sz;
+	long current_idx = start_index;
+	for (long i = 0; i < sz; i++){//检查所有节点，尝试简单降色
+		long node = remaining_vertex[current_idx];
+		current_idx++;
+		if (current_idx >= sz) {
+			current_idx = 0;
+		}
+        long current_color = vertex_color[node];
+        long best_color = current_color;
+		for (long c = 0; c < current_color; c++){
+			if (color_choice[node][c] == 0){
+				best_color = c;
+				break;
+			}
+		}
+		if (best_color != current_color) color_node(node, best_color, false);
+	}
+
+	push_down_move();
+
+	for (long i = 1; i <= max_color; i++){//颜色集合整体交换（大而顶点更多的颜色和小的交换）
+		for (long j = i; j <= max_color; j++){
+			if (color_use_number[j-1] < color_use_number[j]){
+				swap_two_color(j,j-1);
+			}
+		}
+	}
+
+	long score = compute_score();//计算当前解的评分
+	if (score < best_score){//更新最优解和最优评分
+		best_score = score;//更新最优评分
+		for (auto v : remaining_vertex){
+			best_solution[v] = vertex_color[v];//保存当前解为最优解
+		}
+	}
 }
 
 bool color_node(long node, long color, bool lock_it){
@@ -940,6 +940,115 @@ void swap_two_color_reduction(long c1, long c2){
     }
 }
 
+void push_down_move_reduction() {
+    long sz = remaining_vertex.size();
+    if (sz == 0) return;
+
+    if ((long)pd_tmp_cc_delta.size() < vertex_count + 1) {
+        pd_tmp_cc_delta.assign(vertex_count + 1, 0);
+    }
+
+    // BMS 采样规模：可调参数
+    // 小图（采样规模 >= 顶点数）退化为全遍历
+    long sample = std::min(sz, 500L);
+
+    for (long i = 0; i < sample; i++) {
+        // 随机采样一个顶点（允许重复，简化实现）
+        long v = remaining_vertex[rand() % sz];
+
+        long c_v = vertex_color[v];
+        if (c_v == 0) continue;
+
+        // 选 v 的提升目标 c_new：从 c_v+1 开始找第一个不冲突的色号
+        long c_new = -1;
+        for (long c = c_v + 1; c <= max_color; c++) {
+            long cv_at_c = (c < (long)color_choice[v].size()) ? color_choice[v][c] : 0;
+            if (cv_at_c == 0) { c_new = c; break; }
+        }
+        if (c_new == -1) continue;
+
+        long delta = (c_new + get_penalty(v, c_new)) - (c_v + get_penalty(v, c_v));
+
+        vector<long> accepted;
+        pd_dirty_list.clear();
+
+        for (auto u : temp_adjacency_list[v]) {
+            long c_u = vertex_color[u];
+            if (c_u <= c_v) continue;
+
+            long real_cu_at_cv = (c_v < (long)color_choice[u].size()) ? color_choice[u][c_v] : 0;
+            long effective_cc = real_cu_at_cv - 1 + pd_tmp_cc_delta[u];
+            if (effective_cc != 0) continue;
+
+            long eff_old = c_u + get_penalty(u, c_u);
+            long eff_new = c_v + get_penalty(u, c_v);
+            if (eff_new >= eff_old) continue;
+
+            accepted.push_back(u);
+            delta += eff_new - eff_old;
+
+            for (auto w : temp_adjacency_list[u]) {
+                if (pd_tmp_cc_delta[w] == 0) pd_dirty_list.push_back(w);
+                pd_tmp_cc_delta[w]++;
+            }
+        }
+
+        for (long w : pd_dirty_list) pd_tmp_cc_delta[w] = 0;
+        pd_dirty_list.clear();
+
+        if (delta < 0) {
+            color_node_reduction(v, c_new, false);
+            for (long u : accepted) {
+                color_node_reduction(u, c_v, false);
+            }
+        }
+    }
+}
+
+
+// ===== push_down 测试专用 wrapper（测完可删） =====
+void push_down_move_reduction_test() {
+    clock_t pd_begin = clock();
+    long cost_before = cost;
+    long sz_before = remaining_vertex.size();
+
+    // 记录调用前所有节点的颜色，用于统计被移动的节点数
+    static vector<long> color_snapshot;
+    if ((long)color_snapshot.size() < vertex_count + 1) {
+        color_snapshot.assign(vertex_count + 1, 0);
+    }
+    for (auto v : remaining_vertex) {
+        color_snapshot[v] = vertex_color[v];
+    }
+
+    // 调用真正的 push_down 函数
+    push_down_move_reduction();
+
+    // 统计
+    long delta = cost_before - cost;  // 正值 = 改善
+    long moved = 0;
+    for (auto v : remaining_vertex) {
+        if (color_snapshot[v] != vertex_color[v]) moved++;
+    }
+
+    pd_call_count++;
+    if (delta > 0) {
+        pd_success_count++;
+        pd_total_gain += delta;
+    }
+    pd_nodes_moved += moved;
+    pd_total_time += (double)(clock() - pd_begin) / CLOCKS_PER_SEC;
+
+    cerr << "[PD_CALL] #" << pd_call_count
+         << " gain=" << delta
+         << " moved=" << moved
+         << " time=" << (double)(clock() - pd_begin) / CLOCKS_PER_SEC << "s"
+         << " cost_before=" << cost_before
+         << " cost_after=" << cost
+         << endl;
+}
+// =================================================
+
 void update_best_solution_reduction(){
     long sz = remaining_vertex.size();
     long start_index = rand() % sz;
@@ -977,7 +1086,8 @@ void update_best_solution_reduction(){
         }
     }
 
-	push_down_move_reduction();
+	//push_down_move_reduction();
+	//push_down_move_reduction_test();
 
     // 2. 全局颜色集合交换
     for (long i = 1; i <= max_color; i++){
@@ -996,75 +1106,6 @@ void update_best_solution_reduction(){
     }
 
 	unlock_all_vertices(); // 解锁所有节点，准备进入下一轮迭代
-}
-
-void push_down_move_reduction() {
-    long sz = remaining_vertex.size();
-    if (sz == 0) return;
-
-    if ((long)pd_tmp_cc_delta.size() < vertex_count + 1) {
-        pd_tmp_cc_delta.assign(vertex_count + 1, 0);
-    }
-
-    long start_index = rand() % sz;
-    long current_idx = start_index;
-
-    for (long i = 0; i < sz; i++) {
-        long v = remaining_vertex[current_idx];
-        if (++current_idx >= sz) current_idx = 0;
-
-        long c_v = vertex_color[v];
-        if (c_v == 0) continue;
-
-        // 1. 选 v 的提升目标 c_new（不产生冲突的最小色号）
-        long c_new = -1;
-        for (long c = c_v + 1; c <= max_color; c++) {
-            long cv_at_c = (c < (long)color_choice[v].size()) ? color_choice[v][c] : 0;
-            if (cv_at_c == 0) { c_new = c; break; }
-        }
-        if (c_new == -1) continue;
-
-        // 2. v 提升带来的 delta（含 DP 惩罚）
-        long delta = (c_new + get_penalty(v, c_new)) - (c_v + get_penalty(v, c_v));
-
-        // 3. 试算哪些邻居能下推到 c_v
-        vector<long> accepted;
-        pd_dirty_list.clear();
-
-        for (auto u : temp_adjacency_list[v]) {
-            long c_u = vertex_color[u];
-            if (c_u <= c_v) continue;
-
-            long real_cu_at_cv = (c_v < (long)color_choice[u].size()) ? color_choice[u][c_v] : 0;
-            long effective_cc = real_cu_at_cv - 1 + pd_tmp_cc_delta[u];
-            if (effective_cc != 0) continue;
-
-            // 必须检查有效代价下降（DP 惩罚可能让高色号 u 染到 c_v 反而更贵）
-            long eff_old = c_u + get_penalty(u, c_u);
-            long eff_new = c_v + get_penalty(u, c_v);
-            if (eff_new >= eff_old) continue;
-
-            accepted.push_back(u);
-            delta += eff_new - eff_old;
-
-            for (auto w : temp_adjacency_list[u]) {
-                if (pd_tmp_cc_delta[w] == 0) pd_dirty_list.push_back(w);
-                pd_tmp_cc_delta[w]++;
-            }
-        }
-
-        // 4. 清理临时增量
-        for (long w : pd_dirty_list) pd_tmp_cc_delta[w] = 0;
-        pd_dirty_list.clear();
-
-        // 5. 确认有效则实际染色
-        if (delta < 0) {
-            color_node_reduction(v, c_new, false);
-            for (long u : accepted) {
-                color_node_reduction(u, c_v, false);
-            }
-        }
-    }
 }
 
 bool color_node_reduction(long node, long color, bool lock_it){

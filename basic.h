@@ -159,3 +159,13 @@ Vertex_vec_with_index remaining_vertex;
 Vertex_vec_with_index working_vertex;
 Vertex_vec_with_index conflict_node_queue;
 Vertex_vec_with_index valid_node;
+
+
+
+// ===== push_down 测试统计（测完可删） =====
+long pd_call_count = 0;
+long pd_success_count = 0;
+long pd_total_gain = 0;
+long pd_nodes_moved = 0;
+double pd_total_time = 0.0;
+// ==========================================

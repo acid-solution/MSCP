@@ -52,4 +52,17 @@ void print_best_score(){
     }
 	
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
+
+    // ===== push_down 测试汇总（测完可删） =====
+    cerr << "[PD_SUMMARY] " << file_name
+         << " calls=" << pd_call_count
+         << " success=" << pd_success_count
+         << " success_rate=" << (pd_call_count ? (double)pd_success_count / pd_call_count : 0)
+         << " total_gain=" << pd_total_gain
+         << " avg_gain_per_success=" << (pd_success_count ? (double)pd_total_gain / pd_success_count : 0)
+         << " nodes_moved=" << pd_nodes_moved
+         << " total_time=" << pd_total_time << "s"
+         << " time_ratio=" << (final_time > 0 ? pd_total_time / final_time : 0)
+         << endl;
+    // ==========================================
 }
