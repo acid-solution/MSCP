@@ -500,6 +500,8 @@ void big_pertub(long pertub_num, long bms, long conflict_weight){
 		color_node(best_node, best_color);
 		current_iter++;
 	}
+
+	unlock_all_vertices(); // 解锁所有节点，准备进入下一轮迭代
 }
 
 void swap_two_color(long color_1, long color_2){
@@ -1512,9 +1514,10 @@ void big_pertub_reduction(long pertub_num, long bms, long conflict_weight){
 		}
 
 		color_node_reduction(best_node, best_color);
-		
 		current_iter++;
 	}
+	
+	unlock_all_vertices(); // 解锁所有节点，准备进入下一轮迭代
 }
 
 void init_color_reduction(){
