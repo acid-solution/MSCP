@@ -59,6 +59,7 @@ long edge_conflict = 0;
 long current_iter = 0;
 long no_impr = 0;
 long big_pert_node_num = 0;
+long big_pert_num = 0;
 
 long best_score;
 double final_time;
@@ -93,6 +94,7 @@ long reduction_mode = 0;
 long init_mode = 0;
 long localsearch_mode = 0;
 long push_down_mode = 0;
+long pertubation_mode = 0;
 
 vector<vector<short>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
 

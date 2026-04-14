@@ -448,7 +448,7 @@ void perturbation(long bms, long conflict_weight){
 	current_iter++;
 }
 
-void big_pertub(long pertub_num, long bms, long conflict_weight){
+void big_pertub_old(long pertub_num, long bms, long conflict_weight){
 
 	for (long i = 0; i < pertub_num; ++i){
 		long best_node = -1;
@@ -792,7 +792,6 @@ bool color_node(long node, long color, bool lock_it){
 
 void localsearch_old(int cutoff){
 	if (conflict_weight == 0) conflict_weight = 1; //避免冲突权重为0
-	long big_pert_num = 0;
 	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
 	if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500 
 
@@ -822,13 +821,8 @@ void localsearch_old(int cutoff){
 		}
 		if (run_time > cutoff) return;
 		
+		big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
 
-		if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
-			big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
-			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
-			no_impr = 0;
-			big_pert_num++;
-		}
 		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
 
 	}
@@ -1638,7 +1632,6 @@ void init_color_reduction(){
 
 void localsearch_reduction(int cutoff){
 	if (conflict_weight == 0) conflict_weight = 1; //避免冲突权重为0
-	long big_pert_num = 0;
 	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
 	if (big_pert_node_num > 500) big_pert_node_num = 500;//上限500 
 
@@ -1672,12 +1665,8 @@ void localsearch_reduction(int cutoff){
 
 		if (run_time > cutoff) return;
 
-		if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
-			big_pertub_reduction(big_pert_node_num, big_pertub_bms, conflict_weight);
-			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
-			no_impr = 0;
-			big_pert_num++;
-		}
+		big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
+
 		if (edge_conflict == 0) perturbation_reduction(pertub_bms, conflict_weight);//普通扰动
 
 	}

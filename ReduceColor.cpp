@@ -11,8 +11,10 @@ int main(int argc, char* argv[]){
 	init_mode= 1;
 	//0=原版局部搜索，1=reduction局部搜索
 	localsearch_mode = 1;
-	// 0=不使用 push_down，1=使用 push_down
+	//0=不使用 push_down，1=使用 push_down
 	push_down_mode = 1; 
+	//0=原版扰动，1=reduction扰动
+	pertubation_mode = 1;
 
 	file_name= argv[1];
 	cutoff = atoi(argv[2]);
