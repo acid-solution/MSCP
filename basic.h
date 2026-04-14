@@ -92,7 +92,7 @@ long strategy_mode = 0;
 long reduction_mode = 0;
 long init_mode = 0;
 long localsearch_mode = 0;
-
+long push_down_mode = 0;
 
 vector<vector<short>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
 

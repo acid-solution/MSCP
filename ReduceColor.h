@@ -528,17 +528,16 @@ void push_down_move() {
         pd_tmp_cc_delta.assign(vertex_count + 1, 0);
     }
 
-    long start_index = rand() % sz;
-    long current_idx = start_index;
+    // BMS 采样规模
+    long sample = std::min(sz, 500L);
 
-    for (long i = 0; i < sz; i++) {
-        long v = remaining_vertex[current_idx];
-        if (++current_idx >= sz) current_idx = 0;
+    for (long i = 0; i < sample; i++) {
+        long v = remaining_vertex[rand() % sz];
 
         long c_v = vertex_color[v];
         if (c_v == 0) continue;
 
-        // 1. 选 v 的提升目标 c_new（不产生冲突的最小色号）
+        // 选 v 的提升目标 c_new：从 c_v+1 开始找第一个不冲突的色号
         long c_new = -1;
         for (long c = c_v + 1; c <= max_color; c++) {
             long cv_at_c = (c < (long)color_choice[v].size()) ? color_choice[v][c] : 0;
@@ -546,10 +545,9 @@ void push_down_move() {
         }
         if (c_new == -1) continue;
 
-        // 2. v 提升带来的 delta
+        // 原版无 DP 惩罚，delta 只看颜色差
         long delta = c_new - c_v;
 
-        // 3. 试算哪些邻居能下推到 c_v
         vector<long> accepted;
         pd_dirty_list.clear();
 
@@ -558,25 +556,22 @@ void push_down_move() {
             if (c_u <= c_v) continue;
 
             long real_cu_at_cv = (c_v < (long)color_choice[u].size()) ? color_choice[u][c_v] : 0;
-            // v 即将离开 c_v，所以扣掉 v 的贡献
             long effective_cc = real_cu_at_cv - 1 + pd_tmp_cc_delta[u];
             if (effective_cc != 0) continue;
 
+            // 原版：c_u > c_v 必然带来 delta 减小，直接接受
             accepted.push_back(u);
-            delta += c_v - c_u;  // c_u > c_v，必然负
+            delta += c_v - c_u;
 
-            // 更新临时增量（邻居间互斥）
             for (auto w : temp_adjacency_list[u]) {
                 if (pd_tmp_cc_delta[w] == 0) pd_dirty_list.push_back(w);
                 pd_tmp_cc_delta[w]++;
             }
         }
 
-        // 4. 清理临时增量
         for (long w : pd_dirty_list) pd_tmp_cc_delta[w] = 0;
         pd_dirty_list.clear();
 
-        // 5. 确认有效则实际染色
         if (delta < 0) {
             color_node(v, c_new, false);
             for (long u : accepted) {
@@ -607,7 +602,9 @@ void update_best_solution(){
 		if (best_color != current_color) color_node(node, best_color, false);
 	}
 
+	if (push_down_mode == 1) {
 	push_down_move();
+	}
 
 	for (long i = 1; i <= max_color; i++){//颜色集合整体交换（大而顶点更多的颜色和小的交换）
 		for (long j = i; j <= max_color; j++){
@@ -1088,7 +1085,9 @@ void update_best_solution_reduction(){
         }
     }
 
-	//push_down_move_reduction();
+	if (push_down_mode == 1) {
+	push_down_move_reduction();
+	}
 	//push_down_move_reduction_test();
 
     // 2. 全局颜色集合交换
