@@ -97,6 +97,8 @@ long localsearch_mode = 0;
 long push_down_mode = 0;
 long pertubation_mode = 0;
 
+long multi_init_runs = 5;
+
 vector<vector<short>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
 
 vector<long> vertex_freq; // vertex_freq[v] 记录顶点 v 被选择染色的次数

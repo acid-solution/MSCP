@@ -20,7 +20,13 @@ void reduction(long mode){
 
 void init_color(long mode){
     if (mode == 0) {
-        init_color_old(); 
+        init_color_old();
+    } else if (mode == 1) {
+        init_color_degree_desc();
+    } else if (mode == 2) {
+        init_color_multi_random();
+    } else if (mode == 3) {
+        init_color_dp_aware();
     } else {
         cout << "invalid init mode" << endl;
         exit(1);

@@ -259,6 +259,178 @@ void init_color_old(){
     finalize_init();  // 统一尾部
 }
 
+void init_color_degree_desc(){
+    long remaining_size = remaining_vertex.size();
+    long color_threshold = COLOR_NUM;
+    if (remaining_size < color_threshold) color_threshold = remaining_size;
+
+    // 1. 把所有 remaining_vertex 按度数降序排序
+    vector<long> order;
+    order.reserve(remaining_size);
+    for (auto v : remaining_vertex) {
+        order.push_back(v);
+    }
+    sort(order.begin(), order.end(), [](long a, long b){
+        long da = temp_adjacency_list[a].size();
+        long db = temp_adjacency_list[b].size();
+        if (da != db) return da > db;  // 度数降序
+        return a < b;                  // 度数相同时按编号，保证确定性
+    });
+
+    // 2. 按这个顺序贪心染最小可用色
+    for (auto v : order){
+        vector<long> neig_color;
+        neig_color.resize(color_threshold, 0);
+
+        // 注意：这里遍历 adjacency_list 而不是 temp_adjacency_list
+        // 与 init_color_old 保持一致 —— 即使邻居在约简中被剥离，
+        // 只要它已被赋色，就要避让（虽然实际上被剥离的节点 vertex_color 仍是 -1，所以无影响）
+        for (auto u : adjacency_list[v]){
+            if (vertex_color[u] != -1){
+                if (vertex_color[u] >= (long)neig_color.size()) {
+                    neig_color.resize(vertex_color[u] + 2, 0);
+                }
+                neig_color[vertex_color[u]] = 1;
+            }
+        }
+
+        long color = 0;
+        for (long i = 0; i < (long)neig_color.size(); i++){
+            if (neig_color[i] == 0) { color = i; break; }
+        }
+        if (neig_color[color] == 1) color = neig_color.size();
+
+        if (color > max_color) max_color = color;
+        vertex_color[v] = color;
+
+        if ((size_t)color >= color_use_number.size()) {
+            color_use_number.resize(color + 10, 0);
+        }
+        color_use_number[color]++;
+    }
+
+    finalize_init();
+}
+
+void init_color_multi_random(){
+    long runs = multi_init_runs;
+    if (runs < 1) runs = 1;
+
+    long best_pass_cost = std::numeric_limits<long>::max();
+    vector<long> best_color_snapshot(vertex_count + 1, -1);
+    long best_max_color = -1;
+    vector<long> best_color_use_number;
+
+    for (long r = 0; r < runs; ++r) {
+        reset_color_assignment();
+        long pc = single_random_greedy_pass();
+        if (pc < best_pass_cost) {
+            best_pass_cost = pc;
+            // 保存这一轮的快照
+            for (auto v : remaining_vertex) {
+                best_color_snapshot[v] = vertex_color[v];
+            }
+            best_max_color = max_color;
+            best_color_use_number = color_use_number;
+        }
+    }
+
+    // 把最优快照恢复到全局状态
+    reset_color_assignment();
+    for (auto v : remaining_vertex) {
+        vertex_color[v] = best_color_snapshot[v];
+    }
+    max_color = best_max_color;
+    color_use_number = best_color_use_number;
+
+    // 只对最优快照跑一次 finalize
+    finalize_init();
+}
+
+void init_color_dp_aware(){
+    long remaining_size = remaining_vertex.size();
+    long color_threshold = COLOR_NUM;
+    if (remaining_size < color_threshold) color_threshold = remaining_size;
+
+    // 1. 预计算每个节点的 DP 包袱（带惩罚的颜色数）
+    vector<long> dp_burden(vertex_count + 1, 0);
+    for (auto v : remaining_vertex) {
+        long cnt = 0;
+        for (long p : dp_penalty[v]) {
+            if (p > 0) cnt++;
+        }
+        dp_burden[v] = cnt;
+    }
+
+    // 2. 顶点排序：DP 包袱降序，相同则度数降序，再相同按编号
+    vector<long> order;
+    order.reserve(remaining_size);
+    for (auto v : remaining_vertex) order.push_back(v);
+    sort(order.begin(), order.end(), [&dp_burden](long a, long b){
+        if (dp_burden[a] != dp_burden[b]) return dp_burden[a] > dp_burden[b];
+        long da = temp_adjacency_list[a].size();
+        long db = temp_adjacency_list[b].size();
+        if (da != db) return da > db;
+        return a < b;
+    });
+
+    // 3. 对每个节点：在所有"无冲突"颜色里选有效代价最小的
+    for (auto v : order){
+        // 标记已被邻居占用的颜色
+        vector<long> neig_color;
+        neig_color.resize(color_threshold, 0);
+        for (auto u : adjacency_list[v]){
+            if (vertex_color[u] != -1){
+                if (vertex_color[u] >= (long)neig_color.size()) {
+                    neig_color.resize(vertex_color[u] + 2, 0);
+                }
+                neig_color[vertex_color[u]] = 1;
+            }
+        }
+
+        // 搜索范围必须覆盖到 dp_penalty[v] 的全长，
+        // 否则可能错过"小色号有大惩罚、大色号惩罚为 0"的更优选择
+        long penalty_size = (long)dp_penalty[v].size();
+        long search_limit = std::max((long)neig_color.size(), penalty_size);
+
+        long best_color = -1;
+        long best_eff_cost = std::numeric_limits<long>::max();
+
+        for (long c = 0; c < search_limit; ++c) {
+            // 跳过被邻居占用的色
+            if (c < (long)neig_color.size() && neig_color[c] == 1) continue;
+
+            long eff_cost = c + get_penalty(v, c);
+            if (eff_cost < best_eff_cost) {
+                best_eff_cost = eff_cost;
+                best_color = c;
+                // 剪枝：c 单调递增、惩罚非负，
+                // 一旦 c+1 已 >= 当前最优有效代价，后续不可能更好
+                if ((long)(c + 1) >= best_eff_cost) break;
+            }
+        }
+
+        // 兜底：search_limit 内全被占用（极罕见）
+        if (best_color == -1) {
+            best_color = (long)neig_color.size();
+            while (best_color < (long)neig_color.size() && neig_color[best_color] == 1) {
+                best_color++;
+            }
+        }
+
+        long color = best_color;
+        if (color > max_color) max_color = color;
+        vertex_color[v] = color;
+
+        if ((size_t)color >= color_use_number.size()) {
+            color_use_number.resize(color + 10, 0);
+        }
+        color_use_number[color]++;
+    }
+
+    finalize_init();
+}
+
 long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示找到合适节点，0表示没有
 	//long bms = 100;
 	//long iter = 0;

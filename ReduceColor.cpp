@@ -7,7 +7,7 @@ int main(int argc, char* argv[]){
 	strategy_mode = 0;
 	//0=不带约简，1=原版约简，2=dp约简
 	reduction_mode = 0;
-	//0=贪心初始化
+	//0=贪心初始化，1=度数降序初始化，2=多次随机初始化，3=DP感知初始化
 	init_mode= 0;
 	//0=原版局部搜索，1=reduction局部搜索
 	localsearch_mode = 0;

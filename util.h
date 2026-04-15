@@ -186,6 +186,69 @@ void finalize_init(){
     }
 }
 
+long single_random_greedy_pass(){
+    long remaining_size = remaining_vertex.size();
+    long color_threshold = COLOR_NUM;
+    if (remaining_size < color_threshold) color_threshold = remaining_size;
+
+    // 1. 生成随机顺序
+    vector<long> order;
+    order.reserve(remaining_size);
+    for (auto v : remaining_vertex) order.push_back(v);
+    // Fisher-Yates 洗牌
+    for (long i = order.size() - 1; i > 0; --i) {
+        long j = rand() % (i + 1);
+        std::swap(order[i], order[j]);
+    }
+
+    // 2. 按随机顺序贪心染最小可用色
+    long pass_cost = 0;
+    for (auto v : order){
+        vector<long> neig_color;
+        neig_color.resize(color_threshold, 0);
+        for (auto u : adjacency_list[v]){
+            if (vertex_color[u] != -1){
+                if (vertex_color[u] >= (long)neig_color.size()) {
+                    neig_color.resize(vertex_color[u] + 2, 0);
+                }
+                neig_color[vertex_color[u]] = 1;
+            }
+        }
+
+        long color = 0;
+        for (long i = 0; i < (long)neig_color.size(); i++){
+            if (neig_color[i] == 0) { color = i; break; }
+        }
+        if (neig_color[color] == 1) color = neig_color.size();
+
+        if (color > max_color) max_color = color;
+        vertex_color[v] = color;
+
+        if ((size_t)color >= color_use_number.size()) {
+            color_use_number.resize(color + 10, 0);
+        }
+        color_use_number[color]++;
+
+        // 累加选色阶段代价（用于多轮比较）
+        if (localsearch_mode == 1) {
+            pass_cost += color + get_penalty(v, color);
+        } else {
+            pass_cost += color;
+        }
+    }
+    return pass_cost;
+}
+
+void reset_color_assignment(){
+    for (auto v : remaining_vertex) {
+        vertex_color[v] = -1;
+    }
+    max_color = -1;
+    std::fill(color_use_number.begin(), color_use_number.end(), 0);
+}
+
+
+
 inline bool is_lock(long node, long target_color){
     switch (strategy_mode){
         case 0: // Tabu-only
