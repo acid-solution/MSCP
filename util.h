@@ -81,6 +81,111 @@ void test_init_effect(clock_t start_time, clock_t end_time) {
     cout << "========================================================\n" << endl;
 }
 
+void finalize_init(){
+    bool use_reduction = (localsearch_mode == 1);
+
+    // ============ 1. 计算 cost ============
+    cost = 0;
+    for (auto v : remaining_vertex){
+        if (use_reduction) {
+            cost += vertex_color[v] + get_penalty(v, vertex_color[v]);
+        } else {
+            cost += vertex_color[v];
+        }
+    }
+
+    // ============ 2. 初始化 color_penalty_sum（仅 reduction 需要）============
+    if (use_reduction) {
+        for (auto v : remaining_vertex) {
+            long c_src = vertex_color[v];
+            long limit = dp_penalty[v].size();
+            ensure_color_penalty_sum_size(c_src, limit);
+            for (long target_c = 0; target_c < (long)dp_penalty[v].size(); target_c++) {
+                long p = get_penalty(v, target_c);
+                if (p > 0) {
+                    color_penalty_sum[c_src][target_c] += p;
+                }
+            }
+        }
+    }
+
+    // ============ 3. 初始化 color_choice 和冲突信息 ============
+    for (auto v : remaining_vertex){
+        long color_v = vertex_color[v];
+        for (auto u : temp_adjacency_list[v]){
+            if ((size_t)color_v >= color_choice[u].size()) {
+                color_choice[u].resize(color_v + 1, 0);
+            }
+            color_choice[u][color_v]++;
+            if (vertex_color[u] == vertex_color[v]){
+                conflict_vertex_in_color[v]++;
+                edge_conflict++;
+            }
+        }
+    }
+
+    // ============ 4. 初始化 conflict_node_queue 和 good_node_color ============
+    for (auto v : remaining_vertex){
+        if (conflict_vertex_in_color[v] > 0){
+            conflict_node_queue.push_back(v);
+        }
+
+        long current_color = vertex_color[v];
+
+        if (use_reduction) {
+            // reduction 版：要求有效代价更小且冲突不增加
+            long eff_curr_v = current_color + get_penalty(v, current_color);
+            long limit_v = std::min((long)eff_curr_v, max_color + 2);
+            for (long new_color = 0; new_color < limit_v; new_color++) {
+                if (new_color == current_color) continue;
+                long eff_new_color = new_color + get_penalty(v, new_color);
+                short conf_new_color = (new_color < (long)color_choice[v].size())
+                                       ? color_choice[v][new_color] : 0;
+                if (eff_new_color < eff_curr_v &&
+                    conf_new_color <= color_choice[v][current_color]) {
+                    good_node_color[v].emplace_back(new_color);
+                }
+            }
+        } else {
+            // 原版：只要颜色编号更小且冲突不增加
+            for (long new_color = 0; new_color < current_color; new_color++){
+                if (color_choice[v][new_color] <= color_choice[v][current_color]){
+                    good_node_color[v].emplace_back(new_color);
+                }
+            }
+        }
+    }
+
+    // ============ 5. 初始化 valid_node ============
+    for (auto n : remaining_vertex){
+        if (good_node_color[n].size() > 0){
+            valid_node.push_back(n);
+        }
+    }
+
+    // ============ 6. 初始化 best_score 和 best_solution ============
+    if (use_reduction) {
+        best_score = cost + remaining_vertex.size();
+    } else {
+        best_score = compute_score();
+    }
+    for (auto v : remaining_vertex){
+        best_solution[v] = vertex_color[v];
+    }
+
+    if(!verify_solution()) {
+        cout << "error init_color" << endl;
+        exit(0);
+    }
+
+    // ============ 7. CICC 初始化 ============
+    if (strategy_mode == 3) {
+        for (auto v : remaining_vertex) {
+            cicc[v].assign(max_color + 2, 0);
+        }
+    }
+}
+
 inline bool is_lock(long node, long target_color){
     switch (strategy_mode){
         case 0: // Tabu-only
