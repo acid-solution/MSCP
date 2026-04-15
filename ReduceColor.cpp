@@ -27,7 +27,11 @@ int main(int argc, char* argv[]){
 	build();
 
 	reduction(reduction_mode);
+
+	clock_t init_time = clock();
 	init_color(init_mode);
+	test_init_effect(init_time, clock());
+
 	localsearch(localsearch_mode, cutoff);
 
 	print_best_score();

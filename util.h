@@ -49,6 +49,32 @@ bool verify_solution(){
 	return true;
 }
 
+// 在 LS.h 中添加此函数
+void test_init_effect(clock_t start_time, clock_t end_time) {
+    // 1. 计算初始化阶段的纯耗时
+    double time_taken = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    
+    // 2. 区分不同约简模式下的得分计算
+    long current_score = 0;
+    if (reduction_mode == 2) {
+        current_score = compute_score_reduction() + remove_score; 
+    } else {
+        current_score = compute_score() + remove_score;
+    }
+
+    // 3. 打印详细的测试面板
+    cout << "\n================ [ 初始化阶段测试报告 ] ================" << endl;
+    cout << "当前初始化策略 (init_mode) : " << init_mode << endl;
+    cout << "初始化耗时                 : " << time_taken << " 秒" << endl;
+    cout << "最大颜色编号 (max_color)   : " << max_color << " (共使用 " << max_color + 1 << " 种颜色)" << endl;
+    cout << "基础花费 (cost)            : " << cost << endl;
+    cout << "初始冲突边数 (edge_conflict): " << edge_conflict << endl;
+    cout << "初始未解决冲突节点数       : " << conflict_node_queue.size() << endl;
+    cout << "初始总得分 (Score)         : " << current_score << endl;
+    cout << "========================================================\n" << endl;
+
+    exit(0); // 测试完毕后退出程序
+}
 
 inline bool is_lock(long node, long target_color){
     switch (strategy_mode){
@@ -145,3 +171,4 @@ inline void ensure_color_penalty_sum_size(long max_color_needed, long max_target
         }
     }
 } 
+
