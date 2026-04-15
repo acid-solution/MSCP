@@ -19,9 +19,9 @@ void reduction(long mode){
 }
 
 void init_color(long mode){
-    if (mode == 0) {
+    if (mode == 0 && localsearch_mode == 0) {
         init_color_old();
-    } else if (mode == 1) {
+    } else if (mode == 0 && localsearch_mode == 1) {
         init_color_reduction();
     } else {
         cout << "invalid init mode" << endl;
