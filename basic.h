@@ -29,6 +29,7 @@ bool verify_solution();
 bool color_node_reduction(long node, long color, bool lock_it = true);
 long compute_score_reduction();
 
+void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weight);
 
 vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
 vector<vector<long>> temp_adjacency_list;//存储约简后的图结构

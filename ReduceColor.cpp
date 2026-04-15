@@ -6,14 +6,14 @@ int main(int argc, char* argv[]){
 	//0=tabu, 1=CC基础版, 2=CC+tabu混合, 3=CICC
 	strategy_mode = 0;
 	//0=不带约简，1=原版约简，2=dp约简
-	reduction_mode = 2;
+	reduction_mode = 0;
 	//0=原版初始化，1=reduction初始化
-	init_mode= 1;
+	init_mode= 0;
 	//0=原版局部搜索，1=reduction局部搜索
-	localsearch_mode = 1;
+	localsearch_mode = 0;
 	//0=不使用 push_down，1=使用 push_down
 	push_down_mode = 1; 
-	//0=原版扰动，
+	//0=原版扰动
 	pertubation_mode = 0;
 
 	file_name= argv[1];

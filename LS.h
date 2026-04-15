@@ -50,7 +50,7 @@ void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weigh
 		}
     } else if (pertubation_mode == 0 && localsearch_mode == 1) {
         if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
-			big_pertub_old(big_pert_node_num, big_pertub_bms, conflict_weight);
+			big_pertub_reduction(big_pert_node_num, big_pertub_bms, conflict_weight);
 			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
 			no_impr = 0;
 			big_pert_num++;
