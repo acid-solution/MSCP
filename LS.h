@@ -45,20 +45,33 @@ void localsearch(long mode, long cutoff){
 }
 
 void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weight){
-    if(pertubation_mode == 0 && localsearch_mode == 0){ 
+    if(big_pertub_mode == 0 && localsearch_mode == 0){ 
         if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
 			big_pertub_old(big_pert_node_num, big_pertub_bms, conflict_weight);
 			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
 			no_impr = 0;
 			big_pert_num++;
 		}
-    } else if (pertubation_mode == 0 && localsearch_mode == 1) {
+    } else if (big_pertub_mode == 0 && localsearch_mode == 1) {
         if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
 			big_pertub_reduction(big_pert_node_num, big_pertub_bms, conflict_weight);
 			max_no_impr = luby(2,big_pert_num) * max_no_impr_basic; //调整最大无改进次数，2倍luby序列
 			no_impr = 0;
 			big_pert_num++;
 		}
+    } else {
+        cout << "invalid pertubation mode" << endl;
+        exit(1);
+    }
+}
+
+void perturbation(long pertub_bms, long conflict_weight){
+    if(pertubation_mode == 0 && localsearch_mode == 0){ 
+        perturbation_old(pertub_bms, conflict_weight);
+    } else if (pertubation_mode == 0 && localsearch_mode == 1) {
+        perturbation_reduction(pertub_bms, conflict_weight);
+    } else if (pertubation_mode == 1) {
+        chain_perturbation_reduction(pertub_bms, conflict_weight);
     } else {
         cout << "invalid pertubation mode" << endl;
         exit(1);

@@ -96,6 +96,7 @@ long init_mode = 0;
 long localsearch_mode = 0;
 long push_down_mode = 0;
 long pertubation_mode = 0;
+long big_pertub_mode = 0;
 
 long multi_init_runs = 5;
 
