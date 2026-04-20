@@ -520,7 +520,7 @@ long compute_best_score(){//计算交换颜色后的分数
 	return sum ;
 }
 
-void perturbation_o(long bms, long conflict_weight){
+void perturbation_old(long bms, long conflict_weight){
 
 	long best_node = -1;
 	long best_color = -1;
@@ -1198,10 +1198,10 @@ void update_best_solution_reduction(){
 	}
 	//push_down_move_reduction_test();
 
-    if(chain_mode == 1){
-        chain_improve_reduction();
-    }
-
+    // if(chain_mode == 1){
+    //     chain_improve_reduction();
+    // }
+    chain_improve_reduction_test();
 
     // 2. 全局颜色集合交换
     for (long i = 1; i <= max_color; i++){
@@ -2019,4 +2019,41 @@ void chain_improve_reduction() {
         }
         color_node_reduction(seed, best_target, false);
     }
+}
+
+void chain_improve_reduction_test() {
+    clock_t ci_begin = clock();
+    long cost_before = cost;
+ 
+    static vector<long> color_snapshot;
+    if ((long)color_snapshot.size() < vertex_count + 1) {
+        color_snapshot.assign(vertex_count + 1, 0);
+    }
+    for (auto v : remaining_vertex) {
+        color_snapshot[v] = vertex_color[v];
+    }
+ 
+    chain_improve_reduction();
+ 
+    long delta = cost_before - cost;  // 正值 = 改善
+    long moved = 0;
+    for (auto v : remaining_vertex) {
+        if (color_snapshot[v] != vertex_color[v]) moved++;
+    }
+ 
+    ci_call_count++;
+    if (delta > 0) {
+        ci_success_count++;
+        ci_total_gain += delta;
+    }
+    ci_nodes_moved += moved;
+    ci_total_time += (double)(clock() - ci_begin) / CLOCKS_PER_SEC;
+ 
+    cerr << "[CI_CALL] #" << ci_call_count
+         << " gain=" << delta
+         << " moved=" << moved
+         << " time=" << (double)(clock() - ci_begin) / CLOCKS_PER_SEC << "s"
+         << " cost_before=" << cost_before
+         << " cost_after=" << cost
+         << endl;
 }

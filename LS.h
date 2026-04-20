@@ -103,4 +103,14 @@ void print_best_score(){
     //      << " time_ratio=" << (final_time > 0 ? pd_total_time / final_time : 0)
     //      << endl;
     // // ==========================================
+
+    cerr << "[CI_SUMMARY] " << file_name
+         << " calls=" << ci_call_count
+         << " success=" << ci_success_count
+         << " success_rate=" << (ci_call_count ? (double)ci_success_count / ci_call_count : 0)
+         << " total_gain=" << ci_total_gain
+         << " avg_gain_per_success=" << (ci_success_count ? (double)ci_total_gain / ci_success_count : 0)
+         << " nodes_moved=" << ci_nodes_moved
+         << " total_time=" << ci_total_time << "s"
+         << endl;
 }

@@ -32,6 +32,10 @@ long compute_score_reduction();
 void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weight);
 void perturbation(long pertub_bms, long conflict_weight);
 
+void chain_improve_reduction();
+void chain_improve();
+void chain_improve_reduction_test();
+
 vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
 vector<vector<long>> temp_adjacency_list;//存储约简后的图结构
 vector<vector<short>> color_choice; //color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
@@ -177,3 +181,10 @@ long pd_total_gain = 0;
 long pd_nodes_moved = 0;
 double pd_total_time = 0.0;
 // ==========================================
+
+// ===== chain_improve 测试专用 wrapper（测完可删） =====
+static long ci_call_count = 0;
+static long ci_success_count = 0;
+static long ci_total_gain = 0;
+static long ci_nodes_moved = 0;
+static double ci_total_time = 0.0;
