@@ -81,24 +81,29 @@ void test_init_effect(clock_t start_time, clock_t end_time) {
     }
     
     double avg_color = (double)cost / std::max((size_t)1, remaining_vertex.size());
+    bool valid = verify_solution();
     
-    cout << "\n================ [ 初始化阶段测试报告 ] ================" << endl;
-    cout << "文件: " << file_name << " | seed=" << seed << endl;
-    cout << "init_mode                  : " << init_mode << endl;
-    cout << "初始化耗时                 : " << time_taken << " 秒" << endl;
-    cout << "--- 染色结果 ---" << endl;
-    cout << "参与染色节点数             : " << remaining_vertex.size() << endl;
-    cout << "最大颜色编号 (max_color)   : " << max_color << " (共 " << max_color + 1 << " 色)" << endl;
-    cout << "平均颜色编号               : " << avg_color << endl;
-    cout << "基础花费 (cost)            : " << cost << endl;
-    cout << "初始冲突边数               : " << edge_conflict << endl;
-    cout << "初始冲突节点数             : " << conflict_node_queue.size() << endl;
-    cout << "可降色节点数 (valid_node)  : " << valid_node.size() << " / " 
-         << remaining_vertex.size() << " (" 
-         << 100.0 * valid_node.size() / std::max((size_t)1, remaining_vertex.size()) << "%)" << endl;
-    cout << "解合法性                   : " << (verify_solution() ? "PASS" : "FAIL!") << endl;
-    cout << "初始化得分 (Score)         : " << current_score << endl;
-    cout << "========================================================\n" << endl;
+    // TSV 格式:tag \t file \t seed \t init_mode \t reduction_mode \t time \t 
+    //          remaining \t max_color \t avg_color \t cost \t conflict_edge \t 
+    //          conflict_node \t valid_node \t score \t verify
+    cout << "INIT" << "\t"
+         << file_name << "\t"
+         << seed << "\t"
+         << init_mode << "\t"
+         << reduction_mode << "\t"
+         << time_taken << "\t"
+         << remaining_vertex.size() << "\t"
+         << max_color << "\t"
+         << avg_color << "\t"
+         << cost << "\t"
+         << edge_conflict << "\t"
+         << conflict_node_queue.size() << "\t"
+         << valid_node.size() << "\t"
+         << current_score << "\t"
+         << (valid ? "PASS" : "FAIL")
+         << endl;
+
+         exit(0);
 }
 
 void finalize_init(){
