@@ -1670,13 +1670,12 @@ void chain_perturbation_reduction(long bms, long conflict_weight) {
     if (remaining_vertex.size() == 0) return;
  
     long best_net_gain = -vertex_count;  // 所有候选链中的最优净收益
-    // 最优链的记录：seed降色信息 + 链上节点的提色信息
     long best_seed = -1;
     long best_seed_target = -1;
     vector<pair<long, long>> best_chain_moves; // <节点, 新颜色>
  
     for (long trial = 0; trial < bms; ++trial) {
-        // ========== 第1步：随机选种子，寻找降色目标 ==========
+        // ========== 第1步：随机选种子 ==========
         long idx = rand() % remaining_vertex.size();
         long seed = remaining_vertex[idx];
         long seed_color = vertex_color[seed];
@@ -1684,25 +1683,39 @@ void chain_perturbation_reduction(long bms, long conflict_weight) {
         // 种子颜色已经是0，没有降色空间
         if (seed_color == 0) continue;
  
-        // 寻找种子想降到的目标颜色：
-        // 遍历比当前颜色小的颜色，找有效代价最小的那个
         long seed_eff = seed_color + get_penalty(seed, seed_color);
+ 
+        // ========== 第2步：选目标颜色（带打分） ==========
+        // 打分 = 降色收益 - blocker数量（预估代价）
+        // 选得分最高的颜色，兼顾"降得多"和"容易打通"
         long best_target = -1;
-        long best_target_eff = seed_eff;
+        long best_target_score = 0; // 得分必须>0才有意义
  
         for (long c = 0; c < seed_color; ++c) {
             long eff_c = c + get_penalty(seed, c);
-            if (eff_c < best_target_eff) {
-                best_target_eff = eff_c;
+            long seed_gain = seed_eff - eff_c;
+            
+            // 降过去没收益，跳过
+            if (seed_gain <= 0) continue;
+ 
+            // 从 color_choice 直接读 blocker 数量，O(1)
+            long blocker_count = 0;
+            if (c < (long)color_choice[seed].size()) {
+                blocker_count = color_choice[seed][c];
+            }
+ 
+            long score = seed_gain - blocker_count;
+ 
+            if (score > best_target_score) {
+                best_target_score = score;
                 best_target = c;
             }
         }
  
-        // 没有比当前更好的颜色
+        // 没有合适的目标颜色
         if (best_target == -1) continue;
  
-        // ========== 第2步：找阻塞邻居，构造提色链 ==========
-        // 阻塞邻居：颜色恰好等于 best_target 的邻居
+        // ========== 第3步：收集阻塞者 ==========
         vector<long> blockers;
         for (auto v : temp_adjacency_list[seed]) {
             if (vertex_color[v] == best_target) {
@@ -1710,15 +1723,10 @@ void chain_perturbation_reduction(long bms, long conflict_weight) {
             }
         }
  
-        // 没有阻塞者，说明种子可以直接降色——这不应该出现在扰动阶段
-        // （如果出现，说明 good_node_color 没包含它，可能是冲突数条件不满足）
-        // 无论如何，这条链没有扰动意义，跳过
+        // 没有阻塞者，种子可以直接降色，链式扰动无意义
         if (blockers.empty()) continue;
  
-        // 阻塞者太多（比如>5个），链的代价大概率很高，跳过
-        if (blockers.size() > 5) continue;
- 
-        // 为每个阻塞者找最近可行色（比当前颜色大的最小无冲突颜色）
+        // ========== 第4步：为每个阻塞者找最近无冲突色 ==========
         vector<pair<long, long>> chain_moves; // <节点, 新颜色>
         long total_chain_cost = 0;
         bool chain_valid = true;
@@ -1727,43 +1735,25 @@ void chain_perturbation_reduction(long bms, long conflict_weight) {
             long blocker_color = vertex_color[blocker];
             long new_color = -1;
  
-            // 找比 blocker_color 大的最小无冲突颜色
-            // 搜索范围限制在 max_color+2 以内，避免跳到过大的颜色
+            // 搜索范围限制在 max_color+2 以内
             long search_limit = max_color + 2;
             if (search_limit >= COLOR_NUM) search_limit = COLOR_NUM - 1;
  
             for (long c = blocker_color + 1; c <= search_limit; ++c) {
-                // 检查冲突数：该颜色在邻居中没有人用（或者少人用）
                 short conf = 0;
                 if (c < (long)color_choice[blocker].size()) {
                     conf = color_choice[blocker][c];
                 }
-                // 还要排除和种子的冲突：种子即将降到 best_target，不是 c，所以不影响
-                // 但要注意链上其他 blocker 是否也选了同一个颜色
                 if (conf == 0) {
                     new_color = c;
                     break;
                 }
             }
  
-            // 找不到无冲突色，退而求其次：选冲突最小的
+            // 找不到无冲突色 → 整条链作废，不制造冲突
             if (new_color == -1) {
-                short min_conf = 32767;
-                for (long c = blocker_color + 1; c <= search_limit; ++c) {
-                    short conf = 0;
-                    if (c < (long)color_choice[blocker].size()) {
-                        conf = color_choice[blocker][c];
-                    }
-                    if (conf < min_conf) {
-                        min_conf = conf;
-                        new_color = c;
-                    }
-                }
-            }
- 
-            if (new_color == -1) {
-                // 极端情况，给一个 max_color+1
-                new_color = max_color + 1;
+                chain_valid = false;
+                break;
             }
  
             // 计算该 blocker 提色的代价
@@ -1774,14 +1764,13 @@ void chain_perturbation_reduction(long bms, long conflict_weight) {
             chain_moves.push_back({blocker, new_color});
         }
  
-        // ========== 第3步：计算净收益 ==========
-        // 种子降色的收益
+        if (!chain_valid) continue;
+ 
+        // ========== 第5步：计算净收益，和当前最优链比较 ==========
         long seed_gain = (seed_color - best_target)
                        + (get_penalty(seed, seed_color) - get_penalty(seed, best_target));
- 
         long net_gain = seed_gain - total_chain_cost;
  
-        // ========== 第4步：和当前最优链比较 ==========
         if (net_gain > best_net_gain) {
             best_net_gain = net_gain;
             best_seed = seed;
@@ -1790,14 +1779,14 @@ void chain_perturbation_reduction(long bms, long conflict_weight) {
         }
     }
  
-    // ========== 第5步：执行最优链 ==========
+    // ========== 第6步：执行最优链 ==========
     if (best_seed == -1) {
         // 所有采样都没找到有效链，退化到原版单点扰动
         perturbation_reduction(bms, conflict_weight);
         return;
     }
  
-    // 先提色链上的阻塞者（顺序：先提色，再降种子色，避免中间态冲突累积）
+    // 先提色链上的阻塞者
     for (auto& move : best_chain_moves) {
         color_node_reduction(move.first, move.second);
         current_iter++;
