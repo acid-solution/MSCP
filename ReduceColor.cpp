@@ -16,7 +16,7 @@ int main(int argc, char* argv[]){
 	//0=原版大扰动
 	big_pertub_mode = 0; 
 	//0=原版扰动,1=chain扰动
-	pertubation_mode = 0;
+	pertubation_mode = 1;
 
 	file_name= argv[1];
 	cutoff = atoi(argv[2]);
