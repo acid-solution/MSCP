@@ -37,6 +37,8 @@ int main(int argc, char* argv[]){
 	init_color(init_mode);
 	//test_init_effect(init_time, clock());
 
+	if(remove_num == 0) localsearch_mode = 0;//如果没有进行约简，使用原版局部搜索
+	
 	localsearch(localsearch_mode, cutoff);
 
 	print_best_score();
