@@ -36,9 +36,9 @@ void chain_improve_reduction();
 void chain_improve();
 void chain_improve_reduction_test();
 
-vector<vector<long>> adjacency_list;//存储原始的、完整的图结构
-vector<vector<long>> temp_adjacency_list;//存储约简后的图结构
-vector<vector<short>> color_choice; //color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
+vector<vector<int>> adjacency_list;//存储原始的、完整的图结构
+vector<vector<int>> temp_adjacency_list;//存储约简后的图结构
+vector<vector<int>> color_choice; //color_choice[u][c] 表示节点 u 的邻居中有多少个节点被染成了颜色 c
 vector<long> tabu;
 vector<bool> indicator; //在 find_clique 中使用，用于O(1)查询
 vector<long> remove_indicator; //在 find_clique 中使用，标记节点是否被移除
@@ -51,7 +51,7 @@ vector<long> conflict_vertex_in_color; //all the conflict node
 vector<long> best_solution;
 
 vector<vector<short>> good_node_color; //对于每个节点 v，good_node_color[v] 维护了一个候选颜色列表。这个列表里的颜色通常是“好移动”的目标颜色
-vector<vector<long>> color_penalty_sum;
+vector<vector<int>> color_penalty_sum;
 
 vector<long> pd_tmp_cc_delta;
 vector<long> pd_dirty_list;
@@ -92,7 +92,7 @@ long max_no_impr = max_no_impr_basic;
 
 
 //用于存储 DP 惩罚和森林常数
-vector<vector<long>> dp_penalty;
+vector<vector<int>> dp_penalty;
 
 // 策略模式：0=tabu, 1=CC基础版, 2=CC+tabu混合，3=cicc
 long strategy_mode = 0;
@@ -106,9 +106,9 @@ long chain_mode = 0;
 
 long multi_init_runs = 5;
 
-vector<vector<short>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
+vector<vector<int>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
 
-vector<long> vertex_freq; // vertex_freq[v] 记录顶点 v 被选择染色的次数
+vector<int> vertex_freq; // vertex_freq[v] 记录顶点 v 被选择染色的次数
 
 class Vertex_vec_with_index {
 public:
@@ -188,3 +188,4 @@ static long ci_success_count = 0;
 static long ci_total_gain = 0;
 static long ci_nodes_moved = 0;
 static double ci_total_time = 0.0;
+// ==========================================

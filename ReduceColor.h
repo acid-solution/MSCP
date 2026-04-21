@@ -1198,10 +1198,10 @@ void update_best_solution_reduction(){
 	}
 	//push_down_move_reduction_test();
 
-    // if(chain_mode == 1){
-    //     chain_improve_reduction();
-    // }
-    chain_improve_reduction_test();
+    if(chain_mode == 1){
+        chain_improve_reduction();
+    }
+    // chain_improve_reduction_test();
 
     // 2. 全局颜色集合交换
     for (long i = 1; i <= max_color; i++){
