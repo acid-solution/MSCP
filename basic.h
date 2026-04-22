@@ -29,8 +29,8 @@ bool verify_solution();
 bool color_node_reduction(long node, long color, bool lock_it = true);
 long compute_score_reduction();
 
-void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weight);
-void perturbation(long pertub_bms, long conflict_weight);
+void big_pertub(long big_pert_node_num, long big_pertub_bms, double conflict_weight);
+void perturbation(long pertub_bms, double conflict_weight);
 
 void chain_improve_reduction();
 void chain_improve();

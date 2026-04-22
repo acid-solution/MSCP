@@ -437,7 +437,7 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 
 	long best_node = -1;
 	long best_color = -1;
-	long best_color_score = -1;
+	double best_color_score = -1;  // 修复：与 score(double) 类型一致，避免截断
 
 	if (!valid_node.empty()){
 		long fail_count = 0;                          // 【改动】新增：记录跳过次数
@@ -520,18 +520,18 @@ long compute_best_score(){//计算交换颜色后的分数
 	return sum ;
 }
 
-void perturbation_old(long bms, long conflict_weight){
+void perturbation_old(long bms, double conflict_weight){
 
 	long best_node = -1;
 	long best_color = -1;
-	long best_choose_score = -vertex_count;
+	double best_choose_score = -vertex_count;
 
 	for (long i = 0; i < bms; ++i){ //随机采样bms次
 		long index = rand() % remaining_vertex.size();//随机选择一个剩余节点
 		long node = remaining_vertex[index];//获取该节点
 		long current_color = vertex_color[node];//获取该节点的当前颜色
 		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;//随机选择一个比当前颜色大的新颜色
-		long choose_score = (current_color - new_color) ;//计算选择得分，初始为颜色差值的负值
+		double choose_score = (current_color - new_color) ;//计算选择得分，初始为颜色差值的负值
 
 
 		//该节点变成新颜色后，邻居可以换成旧颜色，计算更换后的得分
@@ -557,12 +557,12 @@ void perturbation_old(long bms, long conflict_weight){
 	current_iter++;
 }
 
-void big_pertub_old(long pertub_num, long bms, long conflict_weight){
+void big_pertub_old(long pertub_num, long bms, double conflict_weight){
 
 	for (long i = 0; i < pertub_num; ++i){
 		long best_node = -1;
 		long best_color = -1;
-		long best_choose_score = -vertex_count;
+		double best_choose_score = -vertex_count;
 		
 		long rand_color = rand() * 100 / RAND_MAX;
 		if (rand_color <= 2){
@@ -584,7 +584,7 @@ void big_pertub_old(long pertub_num, long bms, long conflict_weight){
 			//#liyan 2 choice
 			long new_color = rand() % (max_color + 2) ;
 			//long new_color = rand() % (current_color + 1);
-			long choose_score = (current_color - new_color) ;
+			double choose_score = (current_color - new_color) ;
 			choose_score -= color_choice[node][new_color] * conflict_weight;
 			for (auto v : temp_adjacency_list[node]){
 
@@ -1501,11 +1501,11 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
     return 0;
 }
 
-void perturbation_reduction(long bms, long conflict_weight){
+void perturbation_reduction(long bms, double conflict_weight){
 
 	long best_node = -1;
 	long best_color = -1;
-	long best_choose_score = -vertex_count;
+	double best_choose_score = -vertex_count;
 
 	for (long i = 0; i < bms; ++i){ //随机采样bms次
 		long index = rand() % remaining_vertex.size();//随机选择一个剩余节点
@@ -1513,7 +1513,7 @@ void perturbation_reduction(long bms, long conflict_weight){
 		long current_color = vertex_color[node];//获取该节点的当前颜色
 		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;//随机选择一个比当前颜色大的新颜色
 		long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
-        long choose_score = (current_color - new_color) + penalty_diff;
+        double choose_score = (current_color - new_color) + penalty_diff;
 
 
 		//该节点变成新颜色后，邻居可以换成旧颜色，计算更换后的得分
@@ -1570,13 +1570,13 @@ long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu
 	return 1;
 }
 
-void big_pertub_reduction(long pertub_num, long bms, long conflict_weight){
+void big_pertub_reduction(long pertub_num, long bms, double conflict_weight){
 
 	for (long i = 0; i < pertub_num; ++i){
 		long best_node = -1;
 		long best_color = -1;
 		//long best_node_old_color = -1;
-		long best_choose_score = -vertex_count;
+		double best_choose_score = -vertex_count;
 		
 		long rand_color = rand() * 100 / RAND_MAX;
 		if (rand_color <= 2){
@@ -1598,7 +1598,7 @@ void big_pertub_reduction(long pertub_num, long bms, long conflict_weight){
 			long new_color = rand() % (max_color + 2) ;
 			//long new_color = rand() % (current_color + 1);
 			long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
-			long choose_score = (current_color - new_color) + penalty_diff;
+			double choose_score = (current_color - new_color) + penalty_diff;
 
 			choose_score -= color_choice[node][new_color] * conflict_weight;
 			for (auto v : temp_adjacency_list[node]){
@@ -1676,7 +1676,7 @@ void localsearch_reduction(int cutoff){
 
 
 
-void chain_perturbation_reduction(long bms, long conflict_weight) {
+void chain_perturbation_reduction(long bms, double conflict_weight) {
     if (remaining_vertex.size() == 0) return;
  
     long best_net_gain = -vertex_count;  // 所有候选链中的最优净收益

@@ -44,7 +44,7 @@ void localsearch(long mode, long cutoff){
     }
 }
 
-void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weight){
+void big_pertub(long big_pert_node_num, long big_pertub_bms, double conflict_weight){
     if(big_pertub_mode == 0 && localsearch_mode == 0){ 
         if (vertex_count < 100000 && no_impr > max_no_impr){//如果顶点小于10万且10万次迭代没有改进
 			big_pertub_old(big_pert_node_num, big_pertub_bms, conflict_weight);
@@ -65,7 +65,7 @@ void big_pertub(long big_pert_node_num, long big_pertub_bms, long conflict_weigh
     }
 }
 
-void perturbation(long pertub_bms, long conflict_weight){
+void perturbation(long pertub_bms, double conflict_weight){
     if(pertubation_mode == 0 && localsearch_mode == 0){ 
         perturbation_old(pertub_bms, conflict_weight);
     } else if (pertubation_mode == 0 && localsearch_mode == 1) {
