@@ -715,8 +715,8 @@ void update_best_solution(){
 	    push_down_move();
 	}
 
-    if(chain_mode == 1){
-        chain_improve();
+    if(pull_up_mode == 1){
+        pull_up_move();
     }
 
 
@@ -1198,10 +1198,10 @@ void update_best_solution_reduction(){
 	}
 	//push_down_move_reduction_test();
 
-    if(chain_mode == 1){
-        chain_improve_reduction();
+    if(pull_up_mode == 1){
+        pull_up_move_reduction();
     }
-    // chain_improve_reduction_test();
+    // pull_up_move_reduction_test();
 
     // 2. 全局颜色集合交换
     for (long i = 1; i <= max_color; i++){
@@ -1820,7 +1820,7 @@ void chain_perturbation_reduction(long bms, double conflict_weight) {
     no_impr++;
 }
 
-void chain_improve() {
+void pull_up_move() {
     long sz = remaining_vertex.size();
     if (sz == 0) return;
  
@@ -1868,9 +1868,9 @@ void chain_improve() {
         if (blockers.empty()) continue;
  
         // 第4步：为每个阻塞者找最近无冲突色
-        vector<pair<long, long>> chain_moves;
-        long total_chain_cost = 0;
-        bool chain_valid = true;
+        vector<pair<long, long>> pull_up_moves;
+        long total_pull_up_cost = 0;
+        bool pull_up_valid = true;
  
         for (auto blocker : blockers) {
             long blocker_color = vertex_color[blocker];
@@ -1891,34 +1891,34 @@ void chain_improve() {
             }
  
             if (new_color == -1) {
-                chain_valid = false;
+                pull_up_valid = false;
                 break;
             }
  
             // 原版代价 = 纯颜色差
             long cost_u = new_color - blocker_color;
-            total_chain_cost += cost_u;
+            total_pull_up_cost += cost_u;
  
-            chain_moves.push_back({blocker, new_color});
+            pull_up_moves.push_back({blocker, new_color});
         }
  
-        if (!chain_valid) continue;
+        if (!pull_up_valid) continue;
  
         // 第5步：计算净收益，只执行正收益
         long seed_gain = seed_color - best_target;
-        long net_gain = seed_gain - total_chain_cost;
+        long net_gain = seed_gain - total_pull_up_cost;
  
         if (net_gain <= 0) continue;
  
         // 第6步：执行
-        for (auto& move : chain_moves) {
+        for (auto& move : pull_up_moves) {
             color_node(move.first, move.second, false);
         }
         color_node(seed, best_target, false);
     }
 }
  
-void chain_improve_reduction() {
+void pull_up_move_reduction() {
     long sz = remaining_vertex.size();
     if (sz == 0) return;
  
@@ -1969,9 +1969,9 @@ void chain_improve_reduction() {
         if (blockers.empty()) continue;
  
         // 第4步：为每个阻塞者找最近无冲突色
-        vector<pair<long, long>> chain_moves;
-        long total_chain_cost = 0;
-        bool chain_valid = true;
+        vector<pair<long, long>> pull_up_moves;
+        long total_pull_up_cost = 0;
+        bool pull_up_valid = true;
  
         for (auto blocker : blockers) {
             long blocker_color = vertex_color[blocker];
@@ -1992,37 +1992,37 @@ void chain_improve_reduction() {
             }
  
             if (new_color == -1) {
-                chain_valid = false;
+                pull_up_valid = false;
                 break;
             }
  
             // DP版代价 = 颜色差 + 惩罚差
             long cost_u = (new_color - blocker_color)
                         + (get_penalty(blocker, new_color) - get_penalty(blocker, blocker_color));
-            total_chain_cost += cost_u;
+            total_pull_up_cost += cost_u;
  
-            chain_moves.push_back({blocker, new_color});
+            pull_up_moves.push_back({blocker, new_color});
         }
  
-        if (!chain_valid) continue;
+        if (!pull_up_valid) continue;
  
         // 第5步：计算净收益，只执行正收益
         long seed_gain = (seed_color - best_target)
                        + (get_penalty(seed, seed_color) - get_penalty(seed, best_target));
-        long net_gain = seed_gain - total_chain_cost;
+        long net_gain = seed_gain - total_pull_up_cost;
  
         if (net_gain <= 0) continue;
  
         // 第6步：执行
-        for (auto& move : chain_moves) {
+        for (auto& move : pull_up_moves) {
             color_node_reduction(move.first, move.second, false);
         }
         color_node_reduction(seed, best_target, false);
     }
 }
 
-void chain_improve_reduction_test() {
-    clock_t ci_begin = clock();
+void pull_up_move_reduction_test() {
+    clock_t pu_begin = clock();
     long cost_before = cost;
  
     static vector<long> color_snapshot;
@@ -2033,7 +2033,7 @@ void chain_improve_reduction_test() {
         color_snapshot[v] = vertex_color[v];
     }
  
-    chain_improve_reduction();
+    pull_up_move_reduction();
  
     long delta = cost_before - cost;  // 正值 = 改善
     long moved = 0;
@@ -2041,18 +2041,18 @@ void chain_improve_reduction_test() {
         if (color_snapshot[v] != vertex_color[v]) moved++;
     }
  
-    ci_call_count++;
+    pu_call_count++;
     if (delta > 0) {
-        ci_success_count++;
-        ci_total_gain += delta;
+        pu_success_count++;
+        pu_total_gain += delta;
     }
-    ci_nodes_moved += moved;
-    ci_total_time += (double)(clock() - ci_begin) / CLOCKS_PER_SEC;
+    pu_nodes_moved += moved;
+    pu_total_time += (double)(clock() - pu_begin) / CLOCKS_PER_SEC;
  
-    cerr << "[CI_CALL] #" << ci_call_count
+    cerr << "[PU_CALL] #" << pu_call_count
          << " gain=" << delta
          << " moved=" << moved
-         << " time=" << (double)(clock() - ci_begin) / CLOCKS_PER_SEC << "s"
+         << " time=" << (double)(clock() - pu_begin) / CLOCKS_PER_SEC << "s"
          << " cost_before=" << cost_before
          << " cost_after=" << cost
          << endl;

@@ -13,8 +13,8 @@ int main(int argc, char* argv[]){
 	localsearch_mode = 0;
 	//0=不使用 push_down，1=使用 push_down
 	push_down_mode = 0; 
-	//0=不使用 chain，1=使用 chain
-	chain_mode = 0; 
+	//0=不使用 pull_up，1=使用 pull_up
+	pull_up_mode = 0;
 	//0=原版大扰动
 	big_pertub_mode = 0; 
 	//0=原版扰动,1=chain扰动

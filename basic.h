@@ -32,9 +32,9 @@ long compute_score_reduction();
 void big_pertub(long big_pert_node_num, long big_pertub_bms, double conflict_weight);
 void perturbation(long pertub_bms, double conflict_weight);
 
-void chain_improve_reduction();
-void chain_improve();
-void chain_improve_reduction_test();
+void pull_up_move_reduction();
+void pull_up_move();
+void pull_up_move_reduction_test();
 
 vector<vector<int>> adjacency_list;//存储原始的、完整的图结构
 vector<vector<int>> temp_adjacency_list;//存储约简后的图结构
@@ -102,7 +102,7 @@ long localsearch_mode = 0;
 long push_down_mode = 0;
 long pertubation_mode = 0;
 long big_pertub_mode = 0;
-long chain_mode = 0; 
+long pull_up_mode = 0;
 
 long multi_init_runs = 5;
 
@@ -182,10 +182,10 @@ long pd_nodes_moved = 0;
 double pd_total_time = 0.0;
 // ==========================================
 
-// ===== chain_improve 测试专用 wrapper（测完可删） =====
-static long ci_call_count = 0;
-static long ci_success_count = 0;
-static long ci_total_gain = 0;
-static long ci_nodes_moved = 0;
-static double ci_total_time = 0.0;
+// ===== pull_up_move 测试专用 wrapper（测完可删） =====
+static long pu_call_count = 0;
+static long pu_success_count = 0;
+static long pu_total_gain = 0;
+static long pu_nodes_moved = 0;
+static double pu_total_time = 0.0;
 // ==========================================
