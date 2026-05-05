@@ -90,6 +90,53 @@ void print_best_score(){
     }
 	
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
+	long aers_region_samples = aers_enter_count + aers_expand_count;
+	double aers_avg_region_size = aers_region_samples > 0
+		? (double)aers_total_region_size / aers_region_samples
+		: 0.0;
+	double aers_overhead_ratio = final_time > 0
+		? aers_overhead_time / final_time
+		: 0.0;
+	cerr << "[AERS_SUMMARY] file=" << file_name
+	     << " enter=" << aers_enter_count
+	     << " expand=" << aers_expand_count
+	     << " exit=" << aers_exit_count
+	     << " success=" << aers_success_count
+	     << " total_region_iter=" << aers_total_region_iter
+	     << " avg_region_size=" << aers_avg_region_size
+	     << " aers_no_impr=" << aers_no_impr
+	     << " region_no_impr=" << aers_region_no_impr
+	     << " region_no_impr_limit=" << aers_region_no_impr_limit
+	     << " cooldown_until=" << aers_cooldown_until
+	     << " overhead_time=" << aers_overhead_time
+	     << " overhead_ratio=" << aers_overhead_ratio
+	     << " expand_calls=" << aers_expand_call_count
+	     << " scan_edges=" << aers_expand_scan_edges
+	     << " expand_added=" << aers_expand_added
+	     << " skip_not_remaining=" << aers_expand_skip_not_remaining
+	     << " skip_marked=" << aers_expand_skip_marked
+	     << " added_good=" << aers_expand_added_good
+	     << " added_conflict=" << aers_expand_added_conflict
+	     << " choose_samples=" << aers_choose_sample_count
+	     << " choose_skip_empty_good=" << aers_choose_skip_empty_good
+	     << " choose_skip_locked=" << aers_choose_skip_locked
+	     << " remove_samples=" << aers_remove_sample_count
+	     << " remove_sample_miss=" << aers_remove_sample_miss
+	     << " candidate_added=" << aers_candidate_added
+	     << " candidate_skip_marked=" << aers_candidate_skip_marked
+	     << " candidate_skip_duplicate=" << aers_candidate_skip_duplicate
+	     << " candidate_empty_exit=" << aers_candidate_empty_exit
+	     << " boundary_expand_calls=" << aers_boundary_expand_calls
+	     << " boundary_expand_added=" << aers_boundary_expand_added
+	     << " boundary_expand_scan_edges=" << aers_boundary_expand_scan_edges
+	     << " region_no_impr_exit=" << aers_region_no_impr_exit
+	     << " good_pool_size=" << aers_region_good_vertices.size()
+	     << " conflict_pool_size=" << aers_region_conflict_vertices.size()
+	     << " good_pool_samples=" << aers_good_pool_sample_count
+	     << " good_pool_stale=" << aers_good_pool_stale_count
+	     << " conflict_pool_samples=" << aers_conflict_pool_sample_count
+	     << " conflict_pool_stale=" << aers_conflict_pool_stale_count
+	     << endl;
 
     // // ===== push_down 测试汇总（测完可删） =====
     // cerr << "[PD_SUMMARY] " << file_name

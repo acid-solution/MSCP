@@ -1,6 +1,7 @@
 #pragma once
 #include "basic.h"
 #include "util.h"
+#include "aers.h"
 
 
 void read_file(string file_name){
@@ -69,6 +70,62 @@ void build(){
     dp_penalty.resize(vertex_count + 1); 
     color_penalty_sum.assign(COLOR_NUM + 10, vector<int>(COLOR_NUM + 10, 0));
 	vertex_freq.resize(vertex_count + 1, 0);
+	aers_region_mark.assign(vertex_count + 1, 0);
+	aers_active = 0;
+	aers_seed = -1;
+	aers_expand_round = 0;
+	aers_region_iter = 0;
+	aers_force_expand = 0;
+	aers_no_impr = 0;
+	aers_region_no_impr = 0;
+	aers_region_no_impr_limit = max(1L, max_no_impr / 4);
+	aers_cooldown_until = 0;
+	aers_before_perturb_score = 0;
+	aers_overhead_time = 0.0;
+	aers_region_vertices.clear();
+	aers_frontier.clear();
+	aers_next_frontier.clear();
+	aers_outer_candidates.clear();
+	aers_outer_candidate_head = 0;
+	aers_region_good_vertices.clear();
+	aers_region_conflict_vertices.clear();
+	aers_region_stamp = 1;
+	aers_candidate_mark.assign(vertex_count + 1, 0);
+	aers_scanned_mark.assign(vertex_count + 1, 0);
+	aers_boundary_scan_mark.assign(vertex_count + 1, 0);
+	aers_boundary_next_index.assign(vertex_count + 1, 0);
+	aers_good_pool_mark.assign(vertex_count + 1, 0);
+	aers_conflict_pool_mark.assign(vertex_count + 1, 0);
+	aers_enter_count = 0;
+	aers_expand_count = 0;
+	aers_exit_count = 0;
+	aers_success_count = 0;
+	aers_total_region_iter = 0;
+	aers_total_region_size = 0;
+	aers_expand_call_count = 0;
+	aers_expand_scan_edges = 0;
+	aers_expand_added = 0;
+	aers_expand_skip_not_remaining = 0;
+	aers_expand_skip_marked = 0;
+	aers_expand_added_good = 0;
+	aers_expand_added_conflict = 0;
+	aers_choose_sample_count = 0;
+	aers_choose_skip_empty_good = 0;
+	aers_choose_skip_locked = 0;
+	aers_remove_sample_count = 0;
+	aers_remove_sample_miss = 0;
+	aers_candidate_added = 0;
+	aers_candidate_skip_marked = 0;
+	aers_candidate_skip_duplicate = 0;
+	aers_candidate_empty_exit = 0;
+	aers_boundary_expand_calls = 0;
+	aers_boundary_expand_added = 0;
+	aers_boundary_expand_scan_edges = 0;
+	aers_region_no_impr_exit = 0;
+	aers_good_pool_sample_count = 0;
+	aers_good_pool_stale_count = 0;
+	aers_conflict_pool_sample_count = 0;
+	aers_conflict_pool_stale_count = 0;
 
     indicator.resize(vertex_count + 1, false);
 	remove_indicator.resize(vertex_count + 1, false);
@@ -1639,16 +1696,46 @@ void localsearch_reduction(int cutoff){
 
 	while (current_iter < max_iter)//迭代次数
 	{
+		if (aers_mode == 1) {
+			aers_update_region_reduction();
+		}
+
 		long best_node = -1;
 		long best_color = -1;
-		long x = choose_good_node_reduction(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
-		if (x == 1 && best_node != -1){ //如果能找到好的节点，进行贪心
-			color_node_reduction(best_node,best_color);//对该节点进行染色
+		long x = 0;
+		if (aers_active == 1) {
+			x = choose_good_node_reduction_aers(choose_conflict_node_bms,best_node,best_color);
+		}
+		else {
+			x = choose_good_node_reduction(choose_conflict_node_bms,best_node,best_color);
+		}
+		if (x == 1 && best_node != -1){
+			color_node_reduction(best_node,best_color);
 			current_iter++;
 			no_impr++;
+			if (aers_mode == 1) {
+				aers_no_impr++;
+			}
+			if (aers_active == 1) {
+				aers_region_iter++;
+				aers_total_region_iter++;
+				aers_after_region_move_reduction(best_node);
+			}
 		}
 		else{
-			remove_conflict_new4_reduction();//贪心结束，进行冲突移除
+			if (aers_active == 1) {
+				long removed = remove_conflict_new4_reduction_aers();
+				if (removed == 0) {
+					aers_region_no_impr++;
+				}
+			}
+			else {
+				long iter_before_remove = current_iter;
+				remove_conflict_new4_reduction();
+				if (aers_mode == 1 && current_iter > iter_before_remove) {
+					aers_no_impr++;
+				}
+			}
 		}
 		
 		long score = 0;
@@ -1663,13 +1750,27 @@ void localsearch_reduction(int cutoff){
 			update_best_solution_reduction();//更新最优解
 			final_time = run_time;//记录最终时间
 			no_impr = 0;
+			aers_no_impr = 0;
+			aers_cooldown_until = 0;
+			if (aers_active == 1) {
+				aers_success_count++;
+				aers_region_no_impr = 0;
+			}
 		}
 
 		if (run_time > cutoff) return;
 
 		big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
 
-		if (edge_conflict == 0) perturbation_reduction(pertub_bms, conflict_weight);//普通扰动
+		if (edge_conflict == 0 && aers_active == 1) {
+			perturbation_reduction_aers(pertub_bms, conflict_weight);
+		}
+		else if (edge_conflict == 0) {
+			perturbation_reduction(pertub_bms, conflict_weight);
+			if (aers_mode == 1) {
+				aers_no_impr++;
+			}
+		}
 
 	}
 }

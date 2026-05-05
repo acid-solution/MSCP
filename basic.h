@@ -90,6 +90,73 @@ long pertub_bms = bms;
 long big_pertub_bms = bms;
 long max_no_impr = max_no_impr_basic;
 
+// AERS: Adaptive Expanding Region Sampling
+long aers_mode = 0;          // 0=close AERS, 1=open AERS
+long aers_active = 0;        // 0=global search, 1=region search
+long aers_event_log = 0;     // 0=only summary, 1=print enter/expand/exit
+
+long aers_expand_batch_size = 500;
+long aers_max_expand_round = 3;
+long aers_boundary_expand_size = 50;
+
+long aers_seed = -1;
+long aers_expand_round = 0;
+long aers_region_iter = 0;
+long aers_force_expand = 0;
+long aers_no_impr = 0;
+long aers_region_no_impr = 0;
+long aers_region_no_impr_limit = 0;
+long aers_cooldown_until = 0;
+long aers_before_perturb_score = 0;
+double aers_overhead_time = 0.0;
+
+vector<long> aers_region_vertices;
+vector<int> aers_region_mark;
+long aers_region_stamp = 1;
+vector<long> aers_frontier;
+vector<long> aers_next_frontier;
+vector<long> aers_outer_candidates;
+vector<int> aers_candidate_mark;
+vector<int> aers_scanned_mark;
+long aers_outer_candidate_head = 0;
+vector<int> aers_boundary_scan_mark;
+vector<long> aers_boundary_next_index;
+vector<long> aers_region_good_vertices;
+vector<long> aers_region_conflict_vertices;
+vector<int> aers_good_pool_mark;
+vector<int> aers_conflict_pool_mark;
+
+long aers_enter_count = 0;
+long aers_expand_count = 0;
+long aers_exit_count = 0;
+long aers_success_count = 0;
+long aers_total_region_iter = 0;
+long aers_total_region_size = 0;
+long aers_expand_call_count = 0;
+long aers_expand_scan_edges = 0;
+long aers_expand_added = 0;
+long aers_expand_skip_not_remaining = 0;
+long aers_expand_skip_marked = 0;
+long aers_expand_added_good = 0;
+long aers_expand_added_conflict = 0;
+long aers_choose_sample_count = 0;
+long aers_choose_skip_empty_good = 0;
+long aers_choose_skip_locked = 0;
+long aers_remove_sample_count = 0;
+long aers_remove_sample_miss = 0;
+long aers_candidate_added = 0;
+long aers_candidate_skip_marked = 0;
+long aers_candidate_skip_duplicate = 0;
+long aers_candidate_empty_exit = 0;
+long aers_boundary_expand_calls = 0;
+long aers_boundary_expand_added = 0;
+long aers_boundary_expand_scan_edges = 0;
+long aers_region_no_impr_exit = 0;
+long aers_good_pool_sample_count = 0;
+long aers_good_pool_stale_count = 0;
+long aers_conflict_pool_sample_count = 0;
+long aers_conflict_pool_stale_count = 0;
+
 
 //用于存储 DP 惩罚和森林常数
 vector<vector<int>> dp_penalty;
