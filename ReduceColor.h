@@ -1,7 +1,7 @@
 #pragma once
 #include "basic.h"
 #include "util.h"
-
+#include "aers.h"
 
 void read_file(string file_name){
 	ifstream in_file(file_name);
@@ -90,6 +90,7 @@ void build(){
 	working_vertex.init(adjacency_list.size());		//初始化工作节点列表
     conflict_node_queue.init(adjacency_list.size());//初始化冲突节点队列
 	valid_node.init(vertex_count + 1);				//初始化有效节点列表
+	aers_init_storage();
 							//cout << "build done 2" << endl;
 
 	color_choice.resize(vertex_count + 1);
@@ -870,6 +871,7 @@ bool color_node(long node, long color, bool lock_it){
             ++old_conflict;
         } 
         if (vertex_color[v] == color) ++new_conflict;
+        if (aers_inline_sync) aers_sync_active_vertex(v);
     }
 
     // 修改 5: 更新当前节点 node 的 good_node_color
@@ -894,6 +896,7 @@ bool color_node(long node, long color, bool lock_it){
     }
     
     conflict_vertex_in_color[node] = new_conflict;
+    if (aers_inline_sync) aers_sync_active_vertex(node);
     edge_conflict = edge_conflict - 2*old_conflict + 2*new_conflict;
     
     vertex_color[node] = color;
@@ -1409,6 +1412,7 @@ bool color_node_reduction(long node, long color, bool lock_it){
             ++old_conflict;
         } 
         if (vertex_color[v] == color) ++new_conflict;
+        if (aers_inline_sync) aers_sync_active_vertex(v);
     }
 
     // -------------------------------------------------------
@@ -1446,6 +1450,7 @@ bool color_node_reduction(long node, long color, bool lock_it){
     }
     
     conflict_vertex_in_color[node] = new_conflict;
+    if (aers_inline_sync) aers_sync_active_vertex(node);
     edge_conflict = edge_conflict - 2*old_conflict + 2*new_conflict;
     
     vertex_color[node] = color;

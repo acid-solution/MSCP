@@ -35,9 +35,17 @@ void init_color(long mode){
 
 void localsearch(long mode, long cutoff){
     if (mode == 0) {
-        localsearch_old(cutoff);
+        if (aers_mode != 0) {
+            localsearch_aers(cutoff);
+        } else {
+            localsearch_old(cutoff);
+        }
     } else if (mode == 1) {
-        localsearch_reduction(cutoff);
+        if (aers_mode != 0) {
+            localsearch_reduction_aers(cutoff);
+        } else {
+            localsearch_reduction(cutoff);
+        }
     } else {
         cout << "invalid localsearch mode" << endl;
         exit(1);
@@ -79,6 +87,7 @@ void perturbation(long pertub_bms, double conflict_weight){
 }
 
 void print_best_score(){
+    print_aers_metrics();
     // 将历史最优的合法解恢复到当前图中
     for (auto v : remaining_vertex){
         vertex_color[v] = best_solution[v];

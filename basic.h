@@ -11,6 +11,7 @@
 #include <tuple>
 #include <ctime>
 #include <limits>
+#include <cstdlib>
 
 #define COLOR_NUM 2000
 
@@ -28,6 +29,21 @@ bool verify_solution();
  
 bool color_node_reduction(long node, long color, bool lock_it = true);
 long compute_score_reduction();
+long choose_good_node(long bms, long& BestNode, long& BestColor);
+long remove_conflict_new4();
+long compute_best_score();
+long choose_good_node_reduction(long bms, long& BestNode, long& BestColor);
+long remove_conflict_new4_reduction();
+void update_best_solution_reduction();
+void perturbation_reduction(long bms, double conflict_weight);
+bool aers_color_node(long node, long color, bool lock_it = true);
+bool aers_color_node_reduction(long node, long color, bool lock_it = true);
+bool aers_update_region();
+bool aers_update_region_reduction();
+void aers_after_region_move_reduction(long moved_node, bool expand_boundary = true);
+void aers_stop_region_reduction();
+void aers_sync_active_vertex(long v);
+void print_aers_metrics();
 
 void big_pertub(long big_pert_node_num, long big_pertub_bms, double conflict_weight);
 void perturbation(long pertub_bms, double conflict_weight);
@@ -35,6 +51,8 @@ void perturbation(long pertub_bms, double conflict_weight);
 void pull_up_move_reduction();
 void pull_up_move();
 void pull_up_move_reduction_test();
+void localsearch_aers(int cutoff);
+void localsearch_reduction_aers(int cutoff);
 
 vector<vector<int>> adjacency_list;//存储原始的、完整的图结构
 vector<vector<int>> temp_adjacency_list;//存储约简后的图结构
