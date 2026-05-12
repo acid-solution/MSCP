@@ -43,6 +43,7 @@ bool aers_update_region_reduction();
 void aers_after_region_move_reduction(long moved_node, bool expand_boundary = true);
 void aers_stop_region_reduction();
 void aers_sync_active_vertex(long v);
+void aers_inline_sync_active_vertex(long v);
 void print_aers_metrics();
 
 void big_pertub(long big_pert_node_num, long big_pertub_bms, double conflict_weight);

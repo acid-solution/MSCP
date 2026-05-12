@@ -4,7 +4,7 @@ CXX = g++
 CXXFLAGS = -std=c++11 -O3 
 
 # 目标文件名默认值
-TARGET = ReduceColor
+TARGET = ReduceColor.exe
 SRC = ReduceColor.cpp
 
 # --- 核心逻辑：检测命令行是否传入了 DEBUG=1 ---
@@ -13,7 +13,7 @@ ifdef DEBUG
     # 1. 追加 ASan 和 -g 选项
     CXXFLAGS += -fsanitize=address -g -Wall -Wextra
     # 2. 修改输出文件名，避免覆盖正式版 (例如变成 ReduceColor_debug)
-    TARGET := $(TARGET)_debug
+    TARGET := ReduceColor_debug.exe
 else
     # 如果是正式模式 (默认)：
     # 这里可以额外加 -DNDEBUG 关闭 assert (可选)
@@ -26,9 +26,9 @@ endif
 all: $(TARGET)
 
 # 编译命令
-$(TARGET): $(SRC) ReduceColor.h basic.h util.h LS.h
+$(TARGET): $(SRC) ReduceColor.h basic.h util.h LS.h aers.h aers_support.h aers_old.h
 	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET)
 
 # 清理命令
 clean:
-	rm -f ReduceColor ReduceColor_debug
+	rm -f ReduceColor.exe ReduceColor_debug.exe

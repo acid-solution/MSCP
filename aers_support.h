@@ -1,8 +1,19 @@
 #pragma once
 
-// 把本次测得的 AERS 维护时间累计到开销计数器。
-inline void aers_add_overhead(clock_t start_clock) {
-    aers_overhead_ticks += clock() - start_clock;
+// 把本次测得的 AERS 增量耗时累计到指定计数器。
+inline void aers_add_ticks(clock_t& bucket, clock_t start_clock) {
+    bucket += clock() - start_clock;
+}
+
+// 汇总默认诊断中互不重叠的 AERS 增量耗时。
+inline clock_t aers_measured_extra_exclusive_ticks() {
+    return aers_build_region_exclusive_ticks
+        + aers_expand_exclusive_ticks
+        + aers_choose_good_exclusive_ticks
+        + aers_remove_conflict_exclusive_ticks
+        + aers_perturb_choose_exclusive_ticks
+        + aers_after_move_exclusive_ticks
+        + aers_stop_region_exclusive_ticks;
 }
 
 // 判断顶点是否仍在当前可搜索图中。
@@ -145,6 +156,12 @@ void aers_sync_active_vertex(long v) {
     }
 }
 
+// color_node 更新邻居时调用的轻量 AERS 同步入口，只统计调用次数。
+inline void aers_inline_sync_active_vertex(long v) {
+    aers_inline_sync_call_count++;
+    aers_sync_active_vertex(v);
+}
+
 // 如果顶点在 active boundary 池中，就用 O(1) 删除它。
 void aers_remove_boundary_active(long v) {
     if (v < 0 || v >= (long)aers_boundary_active_mark.size()) return;
@@ -176,6 +193,7 @@ void aers_mark_boundary_exhausted(long v) {
         aers_boundary_exhausted_count++;
     }
     aers_boundary_exhausted_mark[v] = aers_region_stamp;
+    aers_remove_boundary_active(v);
 }
 
 // 把 remaining 顶点加入区域，并登记为 boundary 扩张来源。
@@ -191,8 +209,12 @@ void aers_add_region_vertex(long v) {
 
 // 推进一个 boundary 顶点，直到加入一个外部邻居或扫描耗尽。
 bool aers_advance_boundary_vertex(long v) {
-    if (!aers_in_region(v) || aers_boundary_exhausted_mark[v] == aers_region_stamp) {
-        aers_boundary_pool_stale++;
+    if (!aers_in_region(v)) {
+        aers_boundary_advance_stale++;
+        return false;
+    }
+    if (aers_boundary_exhausted_mark[v] == aers_region_stamp) {
+        aers_boundary_advance_skip_exhausted++;
         return false;
     }
 
@@ -237,7 +259,8 @@ void print_aers_metrics() {
     if (aers_mode == 0 || !aers_search_used) return;
 
     double elapsed = (double)(clock() - begin_time) / CLOCKS_PER_SEC;
-    double overhead_time = (double)aers_overhead_ticks / CLOCKS_PER_SEC;
+    clock_t measured_extra_ticks = aers_measured_extra_exclusive_ticks();
+    double overhead_time = (double)measured_extra_ticks / CLOCKS_PER_SEC;
     double overhead_ratio = elapsed > 0 ? overhead_time / elapsed : 0.0;
     double avg_region_size = aers_total_region_iter > 0
         ? (double)aers_total_region_size / (double)aers_total_region_iter
@@ -260,12 +283,16 @@ void print_aers_metrics() {
          << " boundary_expand_added=" << aers_expand_added
          << " boundary_expand_scan_edges=" << aers_scan_edges
          << " boundary_exhausted_count=" << aers_boundary_exhausted_count
-         << " boundary_pool_samples=" << aers_boundary_pool_samples
-         << " boundary_pool_stale=" << aers_boundary_pool_stale
-         << " boundary_pool_empty=" << aers_boundary_pool_empty
+         << " boundary_advance_stale=" << aers_boundary_advance_stale
+         << " boundary_advance_skip_exhausted=" << aers_boundary_advance_skip_exhausted
+         << " boundary_pool_samples=" << 0
+         << " boundary_pool_stale=" << 0
+         << " boundary_pool_empty=" << 0
          << " move_boundary_expand_calls=" << aers_move_boundary_expand_calls
-         << " move_boundary_skip_nonboundary=" << aers_move_boundary_skip_nonboundary
+         << " move_boundary_skip_nonboundary=" << aers_move_boundary_invariant_miss
          << " move_boundary_stale=" << aers_move_boundary_stale
+         << " move_boundary_skip_exhausted=" << aers_move_boundary_skip_exhausted
+         << " move_boundary_invariant_miss=" << aers_move_boundary_invariant_miss
          << " move_boundary_expand_added=" << aers_move_boundary_expand_added
          << " choose_samples=" << aers_choose_samples
          << " choose_skip_empty_good=" << aers_choose_skip_empty_good
@@ -274,12 +301,24 @@ void print_aers_metrics() {
          << " remove_sample_miss=" << aers_remove_sample_miss
          << " good_pool_stale=" << aers_good_pool_stale
          << " conflict_pool_stale=" << aers_conflict_pool_stale
+         << " aers_build_region_exclusive_time=" << (double)aers_build_region_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_expand_exclusive_time=" << (double)aers_expand_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_choose_good_exclusive_time=" << (double)aers_choose_good_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_remove_conflict_exclusive_time=" << (double)aers_remove_conflict_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_perturb_choose_exclusive_time=" << (double)aers_perturb_choose_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_after_move_exclusive_time=" << (double)aers_after_move_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_stop_region_exclusive_time=" << (double)aers_stop_region_exclusive_ticks / CLOCKS_PER_SEC
+         << " aers_measured_extra_exclusive_time=" << overhead_time
+         << " aers_commit_wrapper_calls=" << aers_commit_wrapper_calls
+         << " aers_inline_sync_call_count=" << aers_inline_sync_call_count
          << endl;
 }
 
 // 从带索引的顶点池中用 BMS 打分选择 reduction 扰动 move。
 bool aers_choose_perturb_move(Vertex_vec_with_index& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
+    clock_t start_clock = clock();
     if (pool.empty()) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
         return false;
     }
 
@@ -317,15 +356,21 @@ bool aers_choose_perturb_move(Vertex_vec_with_index& pool, long bms,double confl
         }
     }
 
-    if (best_node == -1) return false;
+    if (best_node == -1) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
+        return false;
+    }
     BestNode = best_node;
     BestColor = best_color;
+    aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
     return true;
 }
 
 // 从 vector 顶点池中用 BMS 打分选择 reduction 扰动 move。
 bool aers_choose_perturb_move(vector<long>& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
+    clock_t start_clock = clock();
     if (pool.empty()) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
         return false;
     }
 
@@ -363,14 +408,19 @@ bool aers_choose_perturb_move(vector<long>& pool, long bms,double conflict_weigh
         }
     }
 
-    if (best_node == -1) return false;
+    if (best_node == -1) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
+        return false;
+    }
     BestNode = best_node;
     BestColor = best_color;
+    aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
     return true;
 }
 
 // 从区域 good move 池中选择最好的 reduction good move。
 long aers_choose_good_node_reduction(long bms, long& BestNode, long& BestColor) {
+    clock_t start_clock = clock();
     long best_node = -1;
     long best_color = -1;
     double best_color_score = -std::numeric_limits<double>::max();
@@ -419,14 +469,19 @@ long aers_choose_good_node_reduction(long bms, long& BestNode, long& BestColor) 
         }
     }
 
-    if (best_node == -1) return 0;
+    if (best_node == -1) {
+        aers_add_ticks(aers_choose_good_exclusive_ticks, start_clock);
+        return 0;
+    }
     BestNode = best_node;
     BestColor = best_color;
+    aers_add_ticks(aers_choose_good_exclusive_ticks, start_clock);
     return 1;
 }
 
 // 在 reduction 路径中只用区域冲突池修复一个冲突。
 bool aers_remove_conflict_reduction() {
+    clock_t start_clock = clock();
     while (!aers_region_conflict_vertices.empty()) {
         long node = aers_region_conflict_vertices[rand() % aers_region_conflict_vertices.size()];
         aers_remove_samples++;
@@ -449,6 +504,7 @@ bool aers_remove_conflict_reduction() {
         }
         if (new_color >= COLOR_NUM) new_color = new_color % COLOR_NUM;
 
+        aers_add_ticks(aers_remove_conflict_exclusive_ticks, start_clock);
         bool ok = aers_color_node_reduction(node, new_color);
         if (!ok) return false;
 
@@ -459,6 +515,7 @@ bool aers_remove_conflict_reduction() {
         return true;
     }
 
+    aers_add_ticks(aers_remove_conflict_exclusive_ticks, start_clock);
     return false;
 }
 

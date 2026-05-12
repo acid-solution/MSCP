@@ -1,6 +1,7 @@
 
 // 提交 old-search move，并临时打开 AERS active 池内联同步。
 bool aers_color_node(long node, long color, bool lock_it) {
+    aers_commit_wrapper_calls++;
     aers_inline_sync = 1;
     bool ok = color_node(node, color, lock_it);
     aers_inline_sync = 0;
@@ -9,7 +10,11 @@ bool aers_color_node(long node, long color, bool lock_it) {
 
 // 从带索引的顶点池中用 BMS 打分选择 old-search 扰动 move。
 bool aers_choose_perturb_move_old(Vertex_vec_with_index& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
-    if (pool.empty()) return false;
+    clock_t start_clock = clock();
+    if (pool.empty()) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
+        return false;
+    }
 
     long best_node = -1;
     long best_color = -1;
@@ -40,15 +45,23 @@ bool aers_choose_perturb_move_old(Vertex_vec_with_index& pool, long bms,double c
         }
     }
 
-    if (best_node == -1) return false;
+    if (best_node == -1) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
+        return false;
+    }
     BestNode = best_node;
     BestColor = best_color;
+    aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
     return true;
 }
 
 // 从 vector 顶点池中用 BMS 打分选择 old-search 扰动 move。
 bool aers_choose_perturb_move_old(vector<long>& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
-    if (pool.empty()) return false;
+    clock_t start_clock = clock();
+    if (pool.empty()) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
+        return false;
+    }
 
     long best_node = -1;
     long best_color = -1;
@@ -79,14 +92,19 @@ bool aers_choose_perturb_move_old(vector<long>& pool, long bms,double conflict_w
         }
     }
 
-    if (best_node == -1) return false;
+    if (best_node == -1) {
+        aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
+        return false;
+    }
     BestNode = best_node;
     BestColor = best_color;
+    aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
     return true;
 }
 
 // 从区域 good move 池中选择最好的 old-search good move。
 long aers_choose_good_node(long bms, long& BestNode, long& BestColor) {
+    clock_t start_clock = clock();
     long best_node = -1;
     long best_color = -1;
     double best_color_score = -std::numeric_limits<double>::max();
@@ -134,14 +152,19 @@ long aers_choose_good_node(long bms, long& BestNode, long& BestColor) {
         }
     }
 
-    if (best_node == -1) return 0;
+    if (best_node == -1) {
+        aers_add_ticks(aers_choose_good_exclusive_ticks, start_clock);
+        return 0;
+    }
     BestNode = best_node;
     BestColor = best_color;
+    aers_add_ticks(aers_choose_good_exclusive_ticks, start_clock);
     return 1;
 }
 
 // 在 old-search 路径中只用区域冲突池修复一个冲突。
 bool aers_remove_conflict() {
+    clock_t start_clock = clock();
     while (!aers_region_conflict_vertices.empty()) {
         long node = aers_region_conflict_vertices[rand() % aers_region_conflict_vertices.size()];
         aers_remove_samples++;
@@ -164,6 +187,7 @@ bool aers_remove_conflict() {
         }
         if (new_color >= COLOR_NUM) new_color = new_color % COLOR_NUM;
 
+        aers_add_ticks(aers_remove_conflict_exclusive_ticks, start_clock);
         if (!aers_color_node(node, new_color)) return false;
 
         current_iter++;
@@ -173,6 +197,7 @@ bool aers_remove_conflict() {
         return true;
     }
 
+    aers_add_ticks(aers_remove_conflict_exclusive_ticks, start_clock);
     return false;
 }
 
