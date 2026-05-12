@@ -203,3 +203,42 @@ stats:    triggers=300000 absorb=134207 repair=2 no_candidate=165791 improve=0 s
 - v2 不应继续从 `remaining_vertex` 盲抽候选，而应优先维护精确候选集。候选应明确到 move 级别，即 `(v, c_src -> c_dst)`，并至少满足：`vertex_color[v] == c_src`、`c_src != c_dst`、`color_use_number[c_src] > 1`、`color_use_number[c_dst] >= color_use_number[c_src]`、`color_choice[v][c_dst] == 0`，以及预计 `delta_score < 0`。
 - 第二阶段候选维护的核心问题应变成：当前有哪些点可以合法进入哪些目标颜色类，以及这些 move 中哪些可能改善 `color_use_number` 排序后的 `score`。采样可以用于候选集内部选择，但不应替代候选集维护本身。
 - 新逻辑必须继续保留独立性能统计，至少能看出触发次数、实际 move 次数、无候选次数、刷新次数和采样成本。
+
+## 2026-05-12 第二阶段 BMS 2x 参数实验
+
+本次实验只提高第二阶段内部使用的 BMS，不改变第一阶段全局参数：
+
+- 默认 `bms` 保持 90。
+- 大图覆盖分支中的 `bms` 保持 10。
+- 新增 `stage2_bms()`，返回当前 `bms * 2`。
+- `stage_two_step_old()` / `stage_two_step_reduction()` 使用 `stage2_bms()` 调用 `choose_good_node*` 和小扰动。
+- 第二阶段不再 fallback 到第一阶段；第三阶段仍保留占位 fallback。
+
+实验目的：观察“只扩大第二阶段搜索采样规模”是否比第一阶段原版分布更容易刷新 `best_score`，同时记录它对迭代数的影响。
+
+测试使用 `as-22july06`、60 秒、seed 1：
+
+```text
+baseline:       as-22july06 27605 57.974 1 7396931
+stage2 bms 2x:  as-22july06 27609 4.765 1 6942084
+stage2 stats:   triggers=125128 moves=171955 improve=4
+
+stage3 disabled + stage2 bms 2x:
+                as-22july06 27582 53.742 1 4285591
+stage2 stats:   triggers=2009090 moves=2771622 improve=13
+```
+
+观察：
+
+- 第二阶段 BMS 2x 确实触发，并产生了 4 次阶段内刷新。
+- 但最终 `best_score` 为 27609，略差于 baseline 的 27605。
+- `current_iter` 从 7396931 降到 6942084，说明第二阶段更大 BMS 带来一定额外成本，但没有像全局 BMS 2x 那样大幅压低迭代数。
+- 60 秒和 70 秒测试中，第二阶段统计完全相同，说明多出来的时间没有继续执行第二阶段。
+- 临时禁用第三阶段后，`no_impr >= T` 的情况继续跑第二阶段，第二阶段触发次数从 125128 增加到 2009090，刷新次数从 4 增加到 13，`best_score` 也改善到 27582。
+
+失败经验：
+
+- 原先 `Stage1 -> Stage2 -> Stage3` 的固定区间切换会让第二阶段过早退出；当第三阶段仍是占位函数时，后续搜索实际变成第三阶段 fallback 到第一阶段，第二阶段无法继续发挥作用。
+- 因此，单看“Stage2 BMS 2x 初版结果略差”会误判。真正暴露的问题是阶段边界设计不合理，以及 Stage3 未实现时不应该让搜索自然流入 Stage3。
+- 第二阶段 BMS 2x 本身不能直接判定失败；在禁用 Stage3 的临时实验中，它继续执行后确实产生更多刷新。
+- 后续不应继续只叠加 BMS 倍率调参，而应先重新设计阶段持续条件：例如在 Stage3 未实现前，让 Stage3 条件继续映射到 Stage2，或给 Stage3 明确独立逻辑和统计，避免占位阶段吞掉有效搜索时间。
