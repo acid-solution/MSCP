@@ -2,6 +2,28 @@
 #include "basic.h"
 #include "util.h"
 
+enum SearchStage {
+	STAGE_ONE = 0,
+	STAGE_TWO = 1,
+	STAGE_THREE = 2
+};
+
+inline SearchStage get_search_stage() {
+	long T = max_no_impr_basic;
+
+	if (no_impr < T) {
+		return STAGE_ONE;
+	} else if (no_impr < 2 * T) {
+		return STAGE_TWO;
+	} else {
+		return STAGE_THREE;
+	}
+}
+
+inline double elapsed_time() {
+	return (double)(clock() - begin_time) / CLOCKS_PER_SEC;
+}
+
 
 void read_file(string file_name){
 	ifstream in_file(file_name);
@@ -904,6 +926,40 @@ bool color_node(long node, long color, bool lock_it){
     return true;
 }
 
+void stage_one_step_old(){
+	long best_node = -1;
+	long best_color = -1;
+	long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
+	if (x == 1 && best_node != -1){ //如果能找到好的节点，进行贪心
+		color_node(best_node,best_color);//对该节点进行染色
+		current_iter++;
+		no_impr++;
+	}
+	else{
+		remove_conflict_new4();//贪心结束，进行冲突移除
+	}
+
+	if (edge_conflict == 0) {
+		long score = compute_best_score();//如果没有冲突，就计算分数，计算时间
+		double run_time = elapsed_time();
+		if (score < best_score) {//如果找到一个更好的解
+			update_best_solution();//更新最优解
+			final_time = run_time;//记录最终时间
+			no_impr = 0;
+		}
+	}
+
+	if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
+}
+
+bool stage_two_step_old(){
+	return false;
+}
+
+bool stage_three_step_old(){
+	return false;
+}
+
 void localsearch_old(int cutoff){
 	if (conflict_weight == 0) conflict_weight = 1; //避免冲突权重为0
 	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
@@ -911,34 +967,26 @@ void localsearch_old(int cutoff){
 
 	while (current_iter < max_iter)//迭代次数
 	{
-		long best_node = -1;
-		long best_color = -1;
-		long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
-		if (x == 1 && best_node != -1){ //如果能找到好的节点，进行贪心
-			color_node(best_node,best_color);//对该节点进行染色
-			current_iter++;
-			no_impr++;
-		}
-		else{
-			remove_conflict_new4();//贪心结束，进行冲突移除
-		}
-		
-		long score = 0;
-		if (edge_conflict == 0) score = compute_best_score();//如果没有冲突，就计算分数，计算时间
-		best_time = clock();
-		double run_time;
-		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
-		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解
-			update_best_solution();//更新最优解
-			final_time = run_time;//记录最终时间
-			no_impr = 0;
-		}
+		double run_time = elapsed_time();
 		if (run_time > cutoff) return;
-		
-		big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
 
-		if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
+		SearchStage stage = get_search_stage();
 
+		if (stage == STAGE_ONE) {
+			stage_one_step_old();
+		}
+		else if (stage == STAGE_TWO) {
+			bool moved = stage_two_step_old();
+			if (!moved) {
+				stage_one_step_old();
+			}
+		}
+		else {
+			bool moved = stage_three_step_old();
+			if (!moved) {
+				stage_one_step_old();
+			}
+		}
 	}
 }
 
@@ -1632,6 +1680,40 @@ void big_pertub_reduction(long pertub_num, long bms, double conflict_weight){
 	unlock_all_vertices(); // 解锁所有节点，准备进入下一轮迭代
 }
 
+void stage_one_step_reduction(){
+	long best_node = -1;
+	long best_color = -1;
+	long x = choose_good_node_reduction(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
+	if (x == 1 && best_node != -1){ //如果能找到好的节点，进行贪心
+		color_node_reduction(best_node,best_color);//对该节点进行染色
+		current_iter++;
+		no_impr++;
+	}
+	else{
+		remove_conflict_new4_reduction();//贪心结束，进行冲突移除
+	}
+
+	if (edge_conflict == 0) {
+		long score = cost + remaining_vertex.size();//如果没有冲突，就计算分数，计算时间
+		double run_time = elapsed_time();
+		if (score < best_score) {//如果找到一个更好的解
+			update_best_solution_reduction();//更新最优解
+			final_time = run_time;//记录最终时间
+			no_impr = 0;
+		}
+	}
+
+	if (edge_conflict == 0) perturbation_reduction(pertub_bms, conflict_weight);//普通扰动
+}
+
+bool stage_two_step_reduction(){
+	return false;
+}
+
+bool stage_three_step_reduction(){
+	return false;
+}
+
 void localsearch_reduction(int cutoff){
 	if (conflict_weight == 0) conflict_weight = 1; //避免冲突权重为0
 	big_pert_node_num = vertex_count / big_pertub_num_k;//计算大扰动节点数
@@ -1639,37 +1721,26 @@ void localsearch_reduction(int cutoff){
 
 	while (current_iter < max_iter)//迭代次数
 	{
-		long best_node = -1;
-		long best_color = -1;
-		long x = choose_good_node_reduction(choose_conflict_node_bms,best_node,best_color);//找到一个好的节点和颜色
-		if (x == 1 && best_node != -1){ //如果能找到好的节点，进行贪心
-			color_node_reduction(best_node,best_color);//对该节点进行染色
-			current_iter++;
-			no_impr++;
-		}
-		else{
-			remove_conflict_new4_reduction();//贪心结束，进行冲突移除
-		}
-		
-		long score = 0;
-        
-		if (edge_conflict == 0) {score = cost + remaining_vertex.size();}//如果没有冲突，就计算分数，计算时间 
-		//if (edge_conflict == 0) score = compute_best_score();
-
-		best_time = clock();
-		double run_time;
-		run_time = (double) (best_time - begin_time) / CLOCKS_PER_SEC;
-		if (edge_conflict == 0 && score < best_score) {//如果找到一个更好的解
-			update_best_solution_reduction();//更新最优解
-			final_time = run_time;//记录最终时间
-			no_impr = 0;
-		}
-
+		double run_time = elapsed_time();
 		if (run_time > cutoff) return;
 
-		big_pertub(big_pert_node_num, big_pertub_bms, conflict_weight);
+		SearchStage stage = get_search_stage();
 
-		if (edge_conflict == 0) perturbation_reduction(pertub_bms, conflict_weight);//普通扰动
+		if (stage == STAGE_ONE) {
+			stage_one_step_reduction();
+		}
+		else if (stage == STAGE_TWO) {
+			bool moved = stage_two_step_reduction();
+			if (!moved) {
+				stage_one_step_reduction();
+			}
+		}
+		else {
+			bool moved = stage_three_step_reduction();
+			if (!moved) {
+				stage_one_step_reduction();
+			}
+		}
 
 	}
 }
