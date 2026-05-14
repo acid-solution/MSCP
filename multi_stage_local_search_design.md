@@ -342,3 +342,69 @@ stats:    triggers=30977091 moves=25460757 no_candidate=5516334 improve=3 sample
 ```
 
 与线性版本相比，归一化版本从 `improve=0` 改为 `improve=3`，最终 `best_score` 从 27635 改善到 27596，并略好于本轮 baseline 27597。它仍然有较高采样成本和大量阶段二触发，后续需要继续观察不同 seed / 更长时间下是否稳定。
+
+## 2026-05-14 第二阶段扰动打分版
+
+进一步讨论后，当前实验方向调整为：阶段二主 move 恢复第一阶段原版 `choose_good_node` / `choose_good_node_reduction`，不再把 `age` / `vertex_freq` 用于主 move 选择。前面的 normalized move scoring 作为历史实验记录保留，但不再作为当前方案。
+
+新的阶段二只改变合法解后的“小扰动”评分。这样更贴近平台期循环中的关键位置：
+
+```text
+小扰动 -> 修复冲突 -> 局部搜索 -> 合法解 -> 尝试刷新 best_score
+```
+
+阶段二执行流程改为：
+
+```text
+choose_good_node / choose_good_node_reduction
+-> 如果有好 move，则执行 color_node / color_node_reduction
+-> 否则 remove_conflict_new4 / remove_conflict_new4_reduction
+-> 如果 edge_conflict == 0，则检查并刷新 best_score
+-> 合法解时执行 stage2_perturbation / stage2_perturbation_reduction
+```
+
+阶段二扰动候选生成完全照搬原版扰动：采样 `remaining_vertex`、保持原版 `new_color` 生成方式、保留原版邻居潜力项和冲突惩罚。唯一变化是最终评分在原版扰动分数上加入本轮 BMS 样本内归一化探索项：
+
+```cpp
+stage2_perturb_score =
+    perturb_base_score
+    + max(1.0, conflict_weight) * exploration_score;
+```
+
+其中：
+
+```cpp
+age_norm =
+    max_age == min_age
+    ? 0.0
+    : (age - min_age) / (double)(max_age - min_age);
+
+low_freq_norm =
+    max_freq == min_freq
+    ? 1.0
+    : (max_freq - freq) / (double)(max_freq - min_freq);
+
+exploration_score = age_norm * low_freq_norm;
+```
+
+这版不新增硬冲突预算，不新增候选截断，也不改变第一阶段。统计输出增加 `perturb_moves` 和 `perturb_samples`，用于区分阶段二主 move 成本和阶段二扰动打分成本：
+
+```text
+[STAGE2_STATS] triggers=... moves=... no_candidate=... improve=... perturb_moves=... perturb_samples=... repairs=...
+```
+
+360 秒测试结果：
+
+```text
+as-22july06, seed 1:
+stage2 perturb scoring:
+          as-22july06 27608 63.289 1 44546804
+stats:    triggers=29985532 moves=24384042 no_candidate=5601490 improve=3 perturb_moves=16271341 perturb_samples=1464420690 repairs=3368519
+
+cnr-2000, seed 1:
+stage2 perturb scoring:
+          cnr-2000 731778 343.841 1 178750856
+stats:    triggers=115429649 moves=108647817 no_candidate=6781832 improve=74 perturb_moves=51663624 perturb_samples=516636240 repairs=4587585
+```
+
+结果信号不理想：`as-22july06` 差于 normalized move scoring 的 27596；`cnr-2000` 也差于原版 baseline 731556 和 normalized move scoring 731661。虽然 `cnr-2000` 的阶段二刷新次数达到 74 次，但最终 `best_score` 没有改善，说明“扰动打分 + age/freq 归一化”这一版不能只凭刷新次数判断有效。

@@ -115,8 +115,9 @@ long long stage2_trigger_count = 0;
 long long stage2_move_count = 0;
 long long stage2_no_candidate_count = 0;
 long long stage2_improve_count = 0;
-long long stage2_sample_count = 0;
 long long stage2_repair_count = 0;
+long long stage2_perturb_move_count = 0;
+long long stage2_perturb_sample_count = 0;
 
 class Vertex_vec_with_index {
 public:

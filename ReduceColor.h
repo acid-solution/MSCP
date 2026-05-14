@@ -22,7 +22,7 @@ inline double elapsed_time() {
 	return (double)(clock() - begin_time) / CLOCKS_PER_SEC;
 }
 
-struct Stage2Candidate {
+struct Stage2PerturbCandidate {
 	long node;
 	long color;
 	double base_score;
@@ -32,13 +32,6 @@ struct Stage2Candidate {
 
 inline double stage2_exploration_weight() {
 	return std::max(1.0, conflict_weight);
-}
-
-inline short safe_color_choice(long node, long color) {
-	if (node < 0 || color < 0) return 0;
-	if ((size_t)node >= color_choice.size()) return 0;
-	if ((size_t)color >= color_choice[node].size()) return 0;
-	return color_choice[node][color];
 }
 
 inline long stage2_age(long node) {
@@ -624,6 +617,74 @@ void perturbation_old(long bms, double conflict_weight){
 	current_iter++;
 }
 
+bool stage2_perturbation_old(long bms, double conflict_weight){
+	if (remaining_vertex.empty()) return false;
+
+	vector<Stage2PerturbCandidate> candidates;
+	if (bms > 0) candidates.reserve((size_t)bms);
+	long min_age = std::numeric_limits<long>::max();
+	long max_age = 0;
+	long min_freq = std::numeric_limits<long>::max();
+	long max_freq = 0;
+
+	for (long i = 0; i < bms; ++i){
+		long index = rand() % remaining_vertex.size();
+		long node = remaining_vertex[index];
+		long current_color = vertex_color[node];
+		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;
+		double choose_score = (current_color - new_color);
+
+		for (auto v : temp_adjacency_list[node]){
+			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
+				long delta_color = (vertex_color[v] - current_color) / 3;
+				choose_score += delta_color;
+			}
+			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
+				long delta_color = (vertex_color[v] - current_color);
+				choose_score += delta_color;
+			}
+			if (vertex_color[v] == new_color) choose_score -= conflict_weight;
+		}
+
+		long age = stage2_age(node);
+		long freq = stage2_vertex_freq(node);
+		Stage2PerturbCandidate candidate = {node, new_color, choose_score, age, freq};
+		candidates.push_back(candidate);
+		if (age < min_age) min_age = age;
+		if (age > max_age) max_age = age;
+		if (freq < min_freq) min_freq = freq;
+		if (freq > max_freq) max_freq = freq;
+		stage2_perturb_sample_count++;
+	}
+
+	if (candidates.empty()) return false;
+
+	double best_score = -1e100;
+	long best_index = -1;
+	for (long i = 0; i < (long)candidates.size(); i++){
+		double age_norm = (max_age == min_age)
+			? 0.0
+			: (candidates[i].age - min_age) / (double)(max_age - min_age);
+		double low_freq_norm = (max_freq == min_freq)
+			? 1.0
+			: (max_freq - candidates[i].freq) / (double)(max_freq - min_freq);
+		double exploration_score = age_norm * low_freq_norm;
+		double stage2_perturb_score = candidates[i].base_score + stage2_exploration_weight() * exploration_score;
+
+		if (stage2_perturb_score > best_score){
+			best_score = stage2_perturb_score;
+			best_index = i;
+		}
+	}
+
+	no_impr++;
+	color_node(candidates[best_index].node, candidates[best_index].color);
+	current_iter++;
+	stage2_perturb_move_count++;
+	record_stage2_move_iter(candidates[best_index].node);
+	return true;
+}
+
 void big_pertub_old(long pertub_num, long bms, double conflict_weight){
 
 	for (long i = 0; i < pertub_num; ++i){
@@ -998,87 +1059,12 @@ void stage_one_step_old(){
 	if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
 }
 
-long choose_stage2_node_old(long bms, long& BestNode, long& BestColor){
-	vector<Stage2Candidate> candidates;
-	if (bms > 0) candidates.reserve((size_t)bms);
-	long min_age = std::numeric_limits<long>::max();
-	long max_age = 0;
-	long min_freq = std::numeric_limits<long>::max();
-	long max_freq = 0;
-
-	BestNode = -1;
-	BestColor = -1;
-
-	if (!valid_node.empty()){
-		long fail_count = 0;
-		long max_fail = bms * 2;
-		for (long i = 0; i < bms; ){
-			if (fail_count >= max_fail) break;
-
-			long index = rand() % valid_node.size();
-			long node = valid_node[index];
-			if (node < 0 || (size_t)node >= good_node_color.size() || good_node_color[node].empty()){
-				fail_count++;
-				continue;
-			}
-
-			index = rand() % good_node_color[node].size();
-			long new_color = good_node_color[node][index];
-			long current_color = vertex_color[node];
-
-			if (new_color == current_color || is_lock(node, new_color)){
-				fail_count++;
-				continue;
-			}
-			i++;
-
-			long old_conflict = safe_color_choice(node, current_color);
-			long new_conflict = safe_color_choice(node, new_color);
-			double base_score = current_color - new_color + conflict_weight * (old_conflict - new_conflict);
-			long age = stage2_age(node);
-			long freq = stage2_vertex_freq(node);
-			Stage2Candidate candidate = {node, new_color, base_score, age, freq};
-			candidates.push_back(candidate);
-			if (age < min_age) min_age = age;
-			if (age > max_age) max_age = age;
-			if (freq < min_freq) min_freq = freq;
-			if (freq > max_freq) max_freq = freq;
-			stage2_sample_count++;
-		}
-	}
-
-	if (!candidates.empty()){
-		double best_stage2_score = -1e100;
-		long best_index = -1;
-		for (long i = 0; i < (long)candidates.size(); i++) {
-			double age_norm = (max_age == min_age)
-				? 0.0
-				: (candidates[i].age - min_age) / (double)(max_age - min_age);
-			double low_freq_norm = (max_freq == min_freq)
-				? 1.0
-				: (max_freq - candidates[i].freq) / (double)(max_freq - min_freq);
-			double exploration_score = age_norm * low_freq_norm;
-			double stage2_score = candidates[i].base_score + stage2_exploration_weight() * exploration_score;
-
-			if (stage2_score > best_stage2_score){
-				best_stage2_score = stage2_score;
-				best_index = i;
-			}
-		}
-
-		BestNode = candidates[best_index].node;
-		BestColor = candidates[best_index].color;
-		return 1;
-	}
-	return 0;
-}
-
 bool stage_two_step_old(){
 	stage2_trigger_count++;
 
 	long best_node = -1;
 	long best_color = -1;
-	long x = choose_stage2_node_old(choose_conflict_node_bms,best_node,best_color);
+	long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);
 	if (x == 1 && best_node != -1){
 		color_node(best_node,best_color);
 		current_iter++;
@@ -1103,7 +1089,7 @@ bool stage_two_step_old(){
 		}
 	}
 
-	if (edge_conflict == 0 && !remaining_vertex.empty()) perturbation(pertub_bms, conflict_weight);
+	if (edge_conflict == 0 && !remaining_vertex.empty()) stage2_perturbation_old(pertub_bms, conflict_weight);
 	return true;
 }
 
@@ -1738,6 +1724,79 @@ void perturbation_reduction(long bms, double conflict_weight){
 	current_iter++;
 }
 
+bool stage2_perturbation_reduction(long bms, double conflict_weight){
+	if (remaining_vertex.empty()) return false;
+
+	vector<Stage2PerturbCandidate> candidates;
+	if (bms > 0) candidates.reserve((size_t)bms);
+	long min_age = std::numeric_limits<long>::max();
+	long max_age = 0;
+	long min_freq = std::numeric_limits<long>::max();
+	long max_freq = 0;
+
+	for (long i = 0; i < bms; ++i){
+		long index = rand() % remaining_vertex.size();
+		long node = remaining_vertex[index];
+		long current_color = vertex_color[node];
+		long new_color = rand() % (max_color - current_color + 1) + current_color + 1;
+		long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
+		double choose_score = (current_color - new_color) + penalty_diff;
+
+		for (auto v : temp_adjacency_list[node]){
+			if (color_choice[v][current_color] == 2 && vertex_color[v] > current_color){
+				long old_eff = vertex_color[v] + get_penalty(v, vertex_color[v]);
+				long new_eff = current_color + get_penalty(v, current_color);
+				long delta_color = (old_eff - new_eff) / 3;
+				choose_score += delta_color;
+			}
+			if (color_choice[v][current_color] == 1 && vertex_color[v] > current_color){
+				long old_eff = vertex_color[v] + get_penalty(v, vertex_color[v]);
+				long new_eff = current_color + get_penalty(v, current_color);
+				long delta_color = old_eff - new_eff;
+				choose_score += delta_color;
+			}
+			if (vertex_color[v] == new_color) choose_score -= conflict_weight;
+		}
+
+		long age = stage2_age(node);
+		long freq = stage2_vertex_freq(node);
+		Stage2PerturbCandidate candidate = {node, new_color, choose_score, age, freq};
+		candidates.push_back(candidate);
+		if (age < min_age) min_age = age;
+		if (age > max_age) max_age = age;
+		if (freq < min_freq) min_freq = freq;
+		if (freq > max_freq) max_freq = freq;
+		stage2_perturb_sample_count++;
+	}
+
+	if (candidates.empty()) return false;
+
+	double best_score = -1e100;
+	long best_index = -1;
+	for (long i = 0; i < (long)candidates.size(); i++){
+		double age_norm = (max_age == min_age)
+			? 0.0
+			: (candidates[i].age - min_age) / (double)(max_age - min_age);
+		double low_freq_norm = (max_freq == min_freq)
+			? 1.0
+			: (max_freq - candidates[i].freq) / (double)(max_freq - min_freq);
+		double exploration_score = age_norm * low_freq_norm;
+		double stage2_perturb_score = candidates[i].base_score + stage2_exploration_weight() * exploration_score;
+
+		if (stage2_perturb_score > best_score){
+			best_score = stage2_perturb_score;
+			best_index = i;
+		}
+	}
+
+	no_impr++;
+	color_node_reduction(candidates[best_index].node, candidates[best_index].color);
+	current_iter++;
+	stage2_perturb_move_count++;
+	record_stage2_move_iter(candidates[best_index].node);
+	return true;
+}
+
 long remove_conflict_new4_reduction(){//随机选择冲突节点，染色后tabu锁住
 	if (edge_conflict > 0){
         long index = rand() % conflict_node_queue.size();
@@ -1853,88 +1912,12 @@ void stage_one_step_reduction(){
 	if (edge_conflict == 0) perturbation_reduction(pertub_bms, conflict_weight);//普通扰动
 }
 
-long choose_stage2_node_reduction(long bms, long& BestNode, long& BestColor){
-	vector<Stage2Candidate> candidates;
-	if (bms > 0) candidates.reserve((size_t)bms);
-	long min_age = std::numeric_limits<long>::max();
-	long max_age = 0;
-	long min_freq = std::numeric_limits<long>::max();
-	long max_freq = 0;
-
-	BestNode = -1;
-	BestColor = -1;
-
-	if (!valid_node.empty()){
-		long fail_count = 0;
-		long max_fail = bms * 2;
-		for (long i = 0; i < bms; ){
-			if (fail_count >= max_fail) break;
-
-			long index = rand() % valid_node.size();
-			long node = valid_node[index];
-			if (node < 0 || (size_t)node >= good_node_color.size() || good_node_color[node].empty()){
-				fail_count++;
-				continue;
-			}
-
-			index = rand() % good_node_color[node].size();
-			long new_color = good_node_color[node][index];
-			long current_color = vertex_color[node];
-
-			if (new_color == current_color || is_lock(node, new_color)){
-				fail_count++;
-				continue;
-			}
-			i++;
-
-			long old_conflict = safe_color_choice(node, current_color);
-			long new_conflict = safe_color_choice(node, new_color);
-			long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
-			double base_score = (current_color - new_color) + penalty_diff + conflict_weight * (old_conflict - new_conflict);
-			long age = stage2_age(node);
-			long freq = stage2_vertex_freq(node);
-			Stage2Candidate candidate = {node, new_color, base_score, age, freq};
-			candidates.push_back(candidate);
-			if (age < min_age) min_age = age;
-			if (age > max_age) max_age = age;
-			if (freq < min_freq) min_freq = freq;
-			if (freq > max_freq) max_freq = freq;
-			stage2_sample_count++;
-		}
-	}
-
-	if (!candidates.empty()){
-		double best_stage2_score = -1e100;
-		long best_index = -1;
-		for (long i = 0; i < (long)candidates.size(); i++) {
-			double age_norm = (max_age == min_age)
-				? 0.0
-				: (candidates[i].age - min_age) / (double)(max_age - min_age);
-			double low_freq_norm = (max_freq == min_freq)
-				? 1.0
-				: (max_freq - candidates[i].freq) / (double)(max_freq - min_freq);
-			double exploration_score = age_norm * low_freq_norm;
-			double stage2_score = candidates[i].base_score + stage2_exploration_weight() * exploration_score;
-
-			if (stage2_score > best_stage2_score){
-				best_stage2_score = stage2_score;
-				best_index = i;
-			}
-		}
-
-		BestNode = candidates[best_index].node;
-		BestColor = candidates[best_index].color;
-		return 1;
-	}
-	return 0;
-}
-
 bool stage_two_step_reduction(){
 	stage2_trigger_count++;
 
 	long best_node = -1;
 	long best_color = -1;
-	long x = choose_stage2_node_reduction(choose_conflict_node_bms,best_node,best_color);
+	long x = choose_good_node_reduction(choose_conflict_node_bms,best_node,best_color);
 	if (x == 1 && best_node != -1){
 		color_node_reduction(best_node,best_color);
 		current_iter++;
@@ -1959,7 +1942,7 @@ bool stage_two_step_reduction(){
 		}
 	}
 
-	if (edge_conflict == 0 && !remaining_vertex.empty()) perturbation_reduction(pertub_bms, conflict_weight);
+	if (edge_conflict == 0 && !remaining_vertex.empty()) stage2_perturbation_reduction(pertub_bms, conflict_weight);
 	return true;
 }
 

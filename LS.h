@@ -94,7 +94,8 @@ void print_best_score(){
 	     << " moves=" << stage2_move_count
 	     << " no_candidate=" << stage2_no_candidate_count
 	     << " improve=" << stage2_improve_count
-	     << " samples=" << stage2_sample_count
+	     << " perturb_moves=" << stage2_perturb_move_count
+	     << " perturb_samples=" << stage2_perturb_sample_count
 	     << " repairs=" << stage2_repair_count
 	     << endl;
 
