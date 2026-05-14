@@ -109,6 +109,14 @@ long multi_init_runs = 5;
 vector<vector<int>> cicc; // cicc[v][c]: >0 表示禁止v去颜色c, <=0 表示允许
 
 vector<int> vertex_freq; // vertex_freq[v] 记录顶点 v 被选择染色的次数
+vector<long> last_move_iter; // last_move_iter[v] records the last recolor iteration for stage 2 age
+
+long long stage2_trigger_count = 0;
+long long stage2_move_count = 0;
+long long stage2_no_candidate_count = 0;
+long long stage2_improve_count = 0;
+long long stage2_sample_count = 0;
+long long stage2_repair_count = 0;
 
 class Vertex_vec_with_index {
 public:

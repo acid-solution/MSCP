@@ -242,3 +242,70 @@ stage2 stats:   triggers=2009090 moves=2771622 improve=13
 - 因此，单看“Stage2 BMS 2x 初版结果略差”会误判。真正暴露的问题是阶段边界设计不合理，以及 Stage3 未实现时不应该让搜索自然流入 Stage3。
 - 第二阶段 BMS 2x 本身不能直接判定失败；在禁用 Stage3 的临时实验中，它继续执行后确实产生更多刷新。
 - 后续不应继续只叠加 BMS 倍率调参，而应先重新设计阶段持续条件：例如在 Stage3 未实现前，让 Stage3 条件继续映射到 Stage2，或给 Stage3 明确独立逻辑和统计，避免占位阶段吞掉有效搜索时间。
+
+## 2026-05-14 第二阶段 age / vertex_freq 增强版一阶段搜索
+
+本次第二阶段不再设计新的颜色类吸收策略，也不再单纯放大 BMS。新的第一版实现遵循更简单的原则：第二阶段照搬第一阶段的 step 结构，只替换候选 move 的评分分布。
+
+阶段二的 old 路径评分为：
+
+```cpp
+base_score =
+    current_color - new_color
+    + conflict_weight * (old_conflict - new_conflict);
+
+stage2_score =
+    base_score
+    + age_weight * age(node)
+    - freq_weight * vertex_freq[node];
+```
+
+阶段二的 reduction 路径在原版 reduction 评分基础上保留 `penalty_diff`：
+
+```cpp
+base_score =
+    (current_color - new_color)
+    + penalty_diff
+    + conflict_weight * (old_conflict - new_conflict);
+
+stage2_score =
+    base_score
+    + age_weight * age(node)
+    - freq_weight * vertex_freq[node];
+```
+
+这里冲突控制完全沿用第一阶段已有的 `conflict_weight * (old_conflict - new_conflict)`，不额外加入 `max_stage2_conflict_delta`、`damage_penalty` 或其他硬预算。也就是说，会增加冲突的 move 仍然可以参与比较，但会自然被第一阶段原有冲突项扣分。
+
+`age(node)` 使用 `current_iter - last_move_iter[node]` 懒计算，不做每轮全图递增。`vertex_freq[node]` 记录顶点真实 recolor 次数。每次 `color_node` / `color_node_reduction` 真正执行改色后都会更新这些历史状态，因此阶段二选择时看到的是阶段一、小扰动和修复动作共同留下的搜索历史。
+
+阶段二执行流程仍然照搬第一阶段：
+
+```text
+choose_stage2_node / choose_stage2_node_reduction
+-> 如果有候选 move，则执行 color_node / color_node_reduction
+-> 否则执行 remove_conflict_new4 / remove_conflict_new4_reduction
+-> 如果 edge_conflict == 0，则检查并刷新 best_score
+-> 合法解时继续执行原版小扰动 perturbation / perturbation_reduction
+```
+
+候选池继续使用第一阶段的 `valid_node` / `good_node_color`，采样规模沿用 `choose_conflict_node_bms`。因此这版阶段二不是“随机乱染色”，而是在第一阶段原有好 move 候选池内，用 `age` 和 `vertex_freq` 改变采样偏好。
+
+Stage3 当前仍未实现。为了避免占位 Stage3 吞掉第二阶段有效搜索时间，当前阶段判断在 `no_impr >= max_no_impr_basic` 后继续执行 Stage2；等第三阶段有真实策略后，再恢复 `STAGE_THREE` 的独立调度。
+
+新增统计输出：
+
+```text
+[STAGE2_STATS] triggers=... moves=... no_candidate=... improve=... samples=... repairs=...
+```
+
+这些统计只用于观察第二阶段触发次数、实际 move 次数、无候选次数、刷新次数、采样成本和冲突修复次数，避免只看最终 `best_score` 而误判阶段二是否真正工作。
+
+初次 360 秒测试使用 `as-22july06`、seed 1：
+
+```text
+baseline: as-22july06 27597 125.46 1 50780309
+stage2:   as-22july06 27635 0.928 1 44954575
+stats:    triggers=31010990 moves=25218415 no_candidate=5792575 improve=0 samples=2261103524 repairs=3174349
+```
+
+这个结果不理想：阶段二大量触发并执行了很多 move，但 `stage2_improve_count = 0`，最终 `best_score` 明显差于 baseline。当前实现可以作为 age / vertex_freq 偏置方案的第一版失败样本保留，用于后续分析；不应在这个结果上继续盲目追加参数调整。

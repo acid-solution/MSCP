@@ -90,6 +90,13 @@ void print_best_score(){
     }
 	
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
+	cerr << "[STAGE2_STATS] triggers=" << stage2_trigger_count
+	     << " moves=" << stage2_move_count
+	     << " no_candidate=" << stage2_no_candidate_count
+	     << " improve=" << stage2_improve_count
+	     << " samples=" << stage2_sample_count
+	     << " repairs=" << stage2_repair_count
+	     << endl;
 
     // // ===== push_down 测试汇总（测完可删） =====
     // cerr << "[PD_SUMMARY] " << file_name

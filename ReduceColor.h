@@ -13,15 +13,50 @@ inline SearchStage get_search_stage() {
 
 	if (no_impr < T) {
 		return STAGE_ONE;
-	} else if (no_impr < 2 * T) {
-		return STAGE_TWO;
-	} else {
-		return STAGE_THREE;
 	}
+	// Stage three is still a placeholder; keep the plateau search in stage two for now.
+	return STAGE_TWO;
 }
 
 inline double elapsed_time() {
 	return (double)(clock() - begin_time) / CLOCKS_PER_SEC;
+}
+
+const double STAGE2_AGE_WEIGHT = 0.001;
+const double STAGE2_FREQ_WEIGHT = 1.0;
+
+inline short safe_color_choice(long node, long color) {
+	if (node < 0 || color < 0) return 0;
+	if ((size_t)node >= color_choice.size()) return 0;
+	if ((size_t)color >= color_choice[node].size()) return 0;
+	return color_choice[node][color];
+}
+
+inline long stage2_age(long node) {
+	if (node < 0 || (size_t)node >= last_move_iter.size()) return current_iter;
+	if (current_iter < last_move_iter[node]) return 0;
+	return current_iter - last_move_iter[node];
+}
+
+inline long stage2_vertex_freq(long node) {
+	if (node < 0 || (size_t)node >= vertex_freq.size()) return 0;
+	return vertex_freq[node];
+}
+
+inline void record_recolor_history(long node) {
+	if (node < 0) return;
+	if ((size_t)node < vertex_freq.size()) {
+		vertex_freq[node]++;
+	}
+	if ((size_t)node < last_move_iter.size()) {
+		last_move_iter[node] = current_iter;
+	}
+}
+
+inline void record_stage2_move_iter(long node) {
+	if (node >= 0 && (size_t)node < last_move_iter.size()) {
+		last_move_iter[node] = current_iter;
+	}
 }
 
 
@@ -91,6 +126,7 @@ void build(){
     dp_penalty.resize(vertex_count + 1); 
     color_penalty_sum.assign(COLOR_NUM + 10, vector<int>(COLOR_NUM + 10, 0));
 	vertex_freq.resize(vertex_count + 1, 0);
+	last_move_iter.assign(vertex_count + 1, current_iter);
 
     indicator.resize(vertex_count + 1, false);
 	remove_indicator.resize(vertex_count + 1, false);
@@ -922,6 +958,7 @@ bool color_node(long node, long color, bool lock_it){
     // 策略层回调：提交移动，统一处理 tabu/CC/CICC 的状态更新
     if (lock_it) {
         lock_unlock(node, old_color, color);
+		record_recolor_history(node);
     }
     return true;
 }
@@ -952,8 +989,91 @@ void stage_one_step_old(){
 	if (edge_conflict == 0) perturbation(pertub_bms, conflict_weight);//普通扰动
 }
 
+long choose_stage2_node_old(long bms, long& BestNode, long& BestColor){
+	long best_node = -1;
+	long best_color = -1;
+	double best_stage2_score = -1e100;
+
+	BestNode = -1;
+	BestColor = -1;
+
+	if (!valid_node.empty()){
+		long fail_count = 0;
+		long max_fail = bms * 2;
+		for (long i = 0; i < bms; ){
+			if (fail_count >= max_fail) break;
+
+			long index = rand() % valid_node.size();
+			long node = valid_node[index];
+			if (node < 0 || (size_t)node >= good_node_color.size() || good_node_color[node].empty()){
+				fail_count++;
+				continue;
+			}
+
+			index = rand() % good_node_color[node].size();
+			long new_color = good_node_color[node][index];
+			long current_color = vertex_color[node];
+
+			if (new_color == current_color || is_lock(node, new_color)){
+				fail_count++;
+				continue;
+			}
+			i++;
+
+			long old_conflict = safe_color_choice(node, current_color);
+			long new_conflict = safe_color_choice(node, new_color);
+			double base_score = current_color - new_color + conflict_weight * (old_conflict - new_conflict);
+			double stage2_score = base_score + STAGE2_AGE_WEIGHT * stage2_age(node) - STAGE2_FREQ_WEIGHT * stage2_vertex_freq(node);
+			stage2_sample_count++;
+
+			if (stage2_score > best_stage2_score){
+				best_stage2_score = stage2_score;
+				best_node = node;
+				best_color = new_color;
+			}
+		}
+	}
+
+	if (best_node != -1){
+		BestNode = best_node;
+		BestColor = best_color;
+		return 1;
+	}
+	return 0;
+}
+
 bool stage_two_step_old(){
-	return false;
+	stage2_trigger_count++;
+
+	long best_node = -1;
+	long best_color = -1;
+	long x = choose_stage2_node_old(choose_conflict_node_bms,best_node,best_color);
+	if (x == 1 && best_node != -1){
+		color_node(best_node,best_color);
+		current_iter++;
+		no_impr++;
+		stage2_move_count++;
+		record_stage2_move_iter(best_node);
+	}
+	else{
+		stage2_no_candidate_count++;
+		if (edge_conflict > 0) stage2_repair_count++;
+		remove_conflict_new4();
+	}
+
+	if (edge_conflict == 0) {
+		long score = compute_best_score();
+		double run_time = elapsed_time();
+		if (score < best_score) {
+			update_best_solution();
+			final_time = run_time;
+			no_impr = 0;
+			stage2_improve_count++;
+		}
+	}
+
+	if (edge_conflict == 0 && !remaining_vertex.empty()) perturbation(pertub_bms, conflict_weight);
+	return true;
 }
 
 bool stage_three_step_old(){
@@ -976,10 +1096,7 @@ void localsearch_old(int cutoff){
 			stage_one_step_old();
 		}
 		else if (stage == STAGE_TWO) {
-			bool moved = stage_two_step_old();
-			if (!moved) {
-				stage_one_step_old();
-			}
+			stage_two_step_old();
 		}
 		else {
 			bool moved = stage_three_step_old();
@@ -1276,8 +1393,6 @@ bool color_node_reduction(long node, long color, bool lock_it){
     cout << "Error: Trying to color an uninitialized or removed node!" << endl;
     return false;
 	}
-	vertex_freq[node]++;
-
     // 使用线性查找替代索引数组
     node_score[node] = 0; // 分数重置
     long old_conflict = 0;
@@ -1500,6 +1615,7 @@ bool color_node_reduction(long node, long color, bool lock_it){
     // 策略层回调：提交移动，统一处理 tabu/CC/CICC 的状态更新（可选）
     if (lock_it) {
         lock_unlock(node, old_color, color);
+		record_recolor_history(node);
     }
     return true;
 }
@@ -1706,8 +1822,92 @@ void stage_one_step_reduction(){
 	if (edge_conflict == 0) perturbation_reduction(pertub_bms, conflict_weight);//普通扰动
 }
 
+long choose_stage2_node_reduction(long bms, long& BestNode, long& BestColor){
+	long best_node = -1;
+	long best_color = -1;
+	double best_stage2_score = -1e100;
+
+	BestNode = -1;
+	BestColor = -1;
+
+	if (!valid_node.empty()){
+		long fail_count = 0;
+		long max_fail = bms * 2;
+		for (long i = 0; i < bms; ){
+			if (fail_count >= max_fail) break;
+
+			long index = rand() % valid_node.size();
+			long node = valid_node[index];
+			if (node < 0 || (size_t)node >= good_node_color.size() || good_node_color[node].empty()){
+				fail_count++;
+				continue;
+			}
+
+			index = rand() % good_node_color[node].size();
+			long new_color = good_node_color[node][index];
+			long current_color = vertex_color[node];
+
+			if (new_color == current_color || is_lock(node, new_color)){
+				fail_count++;
+				continue;
+			}
+			i++;
+
+			long old_conflict = safe_color_choice(node, current_color);
+			long new_conflict = safe_color_choice(node, new_color);
+			long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
+			double base_score = (current_color - new_color) + penalty_diff + conflict_weight * (old_conflict - new_conflict);
+			double stage2_score = base_score + STAGE2_AGE_WEIGHT * stage2_age(node) - STAGE2_FREQ_WEIGHT * stage2_vertex_freq(node);
+			stage2_sample_count++;
+
+			if (stage2_score > best_stage2_score){
+				best_stage2_score = stage2_score;
+				best_node = node;
+				best_color = new_color;
+			}
+		}
+	}
+
+	if (best_node != -1){
+		BestNode = best_node;
+		BestColor = best_color;
+		return 1;
+	}
+	return 0;
+}
+
 bool stage_two_step_reduction(){
-	return false;
+	stage2_trigger_count++;
+
+	long best_node = -1;
+	long best_color = -1;
+	long x = choose_stage2_node_reduction(choose_conflict_node_bms,best_node,best_color);
+	if (x == 1 && best_node != -1){
+		color_node_reduction(best_node,best_color);
+		current_iter++;
+		no_impr++;
+		stage2_move_count++;
+		record_stage2_move_iter(best_node);
+	}
+	else{
+		stage2_no_candidate_count++;
+		if (edge_conflict > 0) stage2_repair_count++;
+		remove_conflict_new4_reduction();
+	}
+
+	if (edge_conflict == 0) {
+		long score = cost + remaining_vertex.size();
+		double run_time = elapsed_time();
+		if (score < best_score) {
+			update_best_solution_reduction();
+			final_time = run_time;
+			no_impr = 0;
+			stage2_improve_count++;
+		}
+	}
+
+	if (edge_conflict == 0 && !remaining_vertex.empty()) perturbation_reduction(pertub_bms, conflict_weight);
+	return true;
 }
 
 bool stage_three_step_reduction(){
@@ -1730,10 +1930,7 @@ void localsearch_reduction(int cutoff){
 			stage_one_step_reduction();
 		}
 		else if (stage == STAGE_TWO) {
-			bool moved = stage_two_step_reduction();
-			if (!moved) {
-				stage_one_step_reduction();
-			}
+			stage_two_step_reduction();
 		}
 		else {
 			bool moved = stage_three_step_reduction();
