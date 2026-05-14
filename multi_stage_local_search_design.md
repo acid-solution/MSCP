@@ -247,36 +247,57 @@ stage2 stats:   triggers=2009090 moves=2771622 improve=13
 
 本次第二阶段不再设计新的颜色类吸收策略，也不再单纯放大 BMS。新的第一版实现遵循更简单的原则：第二阶段照搬第一阶段的 step 结构，只替换候选 move 的评分分布。
 
-阶段二的 old 路径评分为：
+线性版本曾直接使用：
 
 ```cpp
-base_score =
-    current_color - new_color
-    + conflict_weight * (old_conflict - new_conflict);
-
 stage2_score =
     base_score
     + age_weight * age(node)
     - freq_weight * vertex_freq[node];
 ```
 
-阶段二的 reduction 路径在原版 reduction 评分基础上保留 `penalty_diff`：
+这会让 `age` 的原始数量级随着 `current_iter` 快速放大，容易压过第一阶段原版评分，使阶段二从“原版评分上的探索偏置”变成主要按未移动时间选点。
+
+归一化版本改为先保留第一阶段原版评分，再在本轮 BMS 候选集合内部计算探索项。old 路径的 `base_score` 为：
+
+```cpp
+base_score =
+    current_color - new_color
+    + conflict_weight * (old_conflict - new_conflict);
+```
+
+reduction 路径在原版 reduction 评分基础上保留 `penalty_diff`：
 
 ```cpp
 base_score =
     (current_color - new_color)
     + penalty_diff
     + conflict_weight * (old_conflict - new_conflict);
+```
+
+归一化探索项为：
+
+```cpp
+age_norm =
+    max_age == min_age
+    ? 0.0
+    : (age - min_age) / (double)(max_age - min_age);
+
+low_freq_norm =
+    max_freq == min_freq
+    ? 1.0
+    : (max_freq - freq) / (double)(max_freq - min_freq);
+
+exploration_score = age_norm * low_freq_norm;
 
 stage2_score =
     base_score
-    + age_weight * age(node)
-    - freq_weight * vertex_freq[node];
+    + max(1.0, conflict_weight) * exploration_score;
 ```
 
 这里冲突控制完全沿用第一阶段已有的 `conflict_weight * (old_conflict - new_conflict)`，不额外加入 `max_stage2_conflict_delta`、`damage_penalty` 或其他硬预算。也就是说，会增加冲突的 move 仍然可以参与比较，但会自然被第一阶段原有冲突项扣分。
 
-`age(node)` 使用 `current_iter - last_move_iter[node]` 懒计算，不做每轮全图递增。`vertex_freq[node]` 记录顶点真实 recolor 次数。每次 `color_node` / `color_node_reduction` 真正执行改色后都会更新这些历史状态，因此阶段二选择时看到的是阶段一、小扰动和修复动作共同留下的搜索历史。
+`age(node)` 使用 `current_iter - last_move_iter[node]` 懒计算，不做每轮全图递增。`vertex_freq[node]` 记录顶点真实 recolor 次数。每次 `color_node` / `color_node_reduction` 真正执行改色后都会更新这些历史状态，因此阶段二选择时看到的是阶段一、小扰动和修复动作共同留下的搜索历史。归一化只在本轮 BMS 样本内部进行，不做全图扫描，也不减少原有候选检查。
 
 阶段二执行流程仍然照搬第一阶段：
 
@@ -288,7 +309,7 @@ choose_stage2_node / choose_stage2_node_reduction
 -> 合法解时继续执行原版小扰动 perturbation / perturbation_reduction
 ```
 
-候选池继续使用第一阶段的 `valid_node` / `good_node_color`，采样规模沿用 `choose_conflict_node_bms`。因此这版阶段二不是“随机乱染色”，而是在第一阶段原有好 move 候选池内，用 `age` 和 `vertex_freq` 改变采样偏好。
+候选池继续使用第一阶段的 `valid_node` / `good_node_color`，采样规模沿用 `choose_conflict_node_bms`。因此这版阶段二不是“随机乱染色”，而是在第一阶段原有好 move 候选池内，用归一化后的 `age` 和 `vertex_freq` 改变采样偏好。
 
 Stage3 当前仍未实现。为了避免占位 Stage3 吞掉第二阶段有效搜索时间，当前阶段判断在 `no_impr >= max_no_impr_basic` 后继续执行 Stage2；等第三阶段有真实策略后，再恢复 `STAGE_THREE` 的独立调度。
 
@@ -309,3 +330,15 @@ stats:    triggers=31010990 moves=25218415 no_candidate=5792575 improve=0 sample
 ```
 
 这个结果不理想：阶段二大量触发并执行了很多 move，但 `stage2_improve_count = 0`，最终 `best_score` 明显差于 baseline。当前实现可以作为 age / vertex_freq 偏置方案的第一版失败样本保留，用于后续分析；不应在这个结果上继续盲目追加参数调整。
+
+后续归一化版本只修正评分量级，不改变阶段二结构。它的目标是避免原始 `age` 数值过大导致探索项吞掉原版 `base_score`，同时继续保留第一阶段候选池、冲突项和执行流程。
+
+归一化版本 360 秒测试使用 `as-22july06`、seed 1：
+
+```text
+stage2 normalized:
+          as-22july06 27596 11.396 1 46267942
+stats:    triggers=30977091 moves=25460757 no_candidate=5516334 improve=3 samples=2283976789 repairs=3436213
+```
+
+与线性版本相比，归一化版本从 `improve=0` 改为 `improve=3`，最终 `best_score` 从 27635 改善到 27596，并略好于本轮 baseline 27597。它仍然有较高采样成本和大量阶段二触发，后续需要继续观察不同 seed / 更长时间下是否稳定。
