@@ -24,6 +24,204 @@ inline double elapsed_time() {
 	return (double)(clock() - begin_time) / CLOCKS_PER_SEC;
 }
 
+struct TwoPointPerturbCandidate {
+	long v = -1;
+	long u = -1;
+	long a = -1;
+	long b = -1;
+	long d = -1;
+	double score = -std::numeric_limits<double>::infinity();
+	double v_loss = 0;
+	double u_gain = 0;
+	double hidden_gain = 0;
+	double conflict_penalty = 0;
+};
+
+inline long safe_color_choice(long node, long color) {
+	if (node < 0 || color < 0) return 0;
+	if (node >= (long)color_choice.size()) return 0;
+	if (color >= (long)color_choice[node].size()) return 0;
+	return color_choice[node][color];
+}
+
+inline long two_point_effective_color(long node, long color, bool reduction) {
+	if (!reduction) return color;
+	return color + get_penalty(node, color);
+}
+
+inline double two_point_potential_gain(long node, long target_color, long equivalent_count, bool reduction) {
+	if (node < 0 || target_color < 0) return 0;
+	if (vertex_color[node] <= target_color) return 0;
+
+	long current_eff = two_point_effective_color(node, vertex_color[node], reduction);
+	long target_eff = two_point_effective_color(node, target_color, reduction);
+	double gain = current_eff - target_eff;
+	if (gain <= 0) return 0;
+
+	if (equivalent_count == 0) return gain;
+	if (equivalent_count == 1) return gain / 3.0;
+	return 0;
+}
+
+double two_point_hidden_gain(long v, long u, long a, long b, long d, bool reduction) {
+	static vector<unsigned char> relation;
+	static vector<long> touched;
+
+	if ((long)relation.size() <= vertex_count) {
+		touched.clear();
+		relation.assign(vertex_count + 1, 0);
+	} else {
+		touched.clear();
+	}
+
+	auto mark_neighbor = [&](long node, unsigned char flag) {
+		if (node < 0 || node > vertex_count) return;
+		if (relation[node] == 0) touched.push_back(node);
+		relation[node] |= flag;
+	};
+
+	for (auto w : temp_adjacency_list[v]) {
+		mark_neighbor(w, 1);
+	}
+	for (auto w : temp_adjacency_list[u]) {
+		mark_neighbor(w, 2);
+	}
+
+	double hidden_gain = 0;
+	for (auto w : touched) {
+		bool neighbor_of_v = (relation[w] & 1) != 0;
+		bool neighbor_of_u = (relation[w] & 2) != 0;
+		double best_gain = 0;
+
+		if (neighbor_of_v && w != u) {
+			long equivalent_a = safe_color_choice(w, a) - 1;
+			if (neighbor_of_u) equivalent_a++;
+			if (equivalent_a < 0) equivalent_a = 0;
+			best_gain = max(best_gain, two_point_potential_gain(w, a, equivalent_a, reduction));
+		}
+
+		if (neighbor_of_u) {
+			long equivalent_d = safe_color_choice(w, d) - 1;
+			if (b == d && neighbor_of_v) equivalent_d++;
+			if (equivalent_d < 0) equivalent_d = 0;
+			best_gain = max(best_gain, two_point_potential_gain(w, d, equivalent_d, reduction));
+		}
+
+		hidden_gain += best_gain;
+	}
+
+	for (auto w : touched) {
+		relation[w] = 0;
+	}
+
+	return hidden_gain;
+}
+
+bool build_two_point_candidate(long v, long b, double conflict_weight, bool reduction, TwoPointPerturbCandidate& candidate) {
+	if (v < 0 || v >= (long)vertex_color.size()) return false;
+	if (temp_adjacency_list[v].empty()) return false;
+
+	long a = vertex_color[v];
+	if (b <= a) return false;
+
+	long start = rand() % temp_adjacency_list[v].size();
+	long selected_u = -1;
+	long selected_d = -1;
+	for (long offset = 0; offset < (long)temp_adjacency_list[v].size(); offset++) {
+		long u = temp_adjacency_list[v][(start + offset) % temp_adjacency_list[v].size()];
+		long d = vertex_color[u];
+		if (d > a && safe_color_choice(u, a) == 1) {
+			selected_u = u;
+			selected_d = d;
+			break;
+		}
+	}
+
+	if (selected_u == -1) return false;
+
+	long conflict_count = safe_color_choice(v, b);
+	if (b == selected_d) conflict_count--;
+	if (conflict_count < 0) conflict_count = 0;
+
+	candidate.v = v;
+	candidate.u = selected_u;
+	candidate.a = a;
+	candidate.b = b;
+	candidate.d = selected_d;
+	candidate.v_loss = two_point_effective_color(v, a, reduction) - two_point_effective_color(v, b, reduction);
+	candidate.u_gain = two_point_effective_color(selected_u, selected_d, reduction) - two_point_effective_color(selected_u, a, reduction);
+	candidate.hidden_gain = two_point_hidden_gain(v, selected_u, a, b, selected_d, reduction);
+	candidate.conflict_penalty = conflict_weight * conflict_count;
+	candidate.score = candidate.v_loss + candidate.u_gain + candidate.hidden_gain - candidate.conflict_penalty;
+	return true;
+}
+
+bool two_point_lookahead_perturbation_impl(long bms, double conflict_weight, bool reduction) {
+	stage2_two_perturb_trigger_count++;
+
+	if (remaining_vertex.empty()) {
+		stage2_two_perturb_false_count++;
+		return false;
+	}
+
+	bool found = false;
+	TwoPointPerturbCandidate best_candidate;
+
+	for (long i = 0; i < bms; i++) {
+		stage2_two_perturb_sample_count++;
+		long index = rand() % remaining_vertex.size();
+		long v = remaining_vertex[index];
+		long a = vertex_color[v];
+		long b = rand() % (max_color - a + 1) + a + 1;
+
+		TwoPointPerturbCandidate candidate;
+		if (!build_two_point_candidate(v, b, conflict_weight, reduction, candidate)) {
+			continue;
+		}
+		stage2_two_perturb_candidate_count++;
+
+		if (!found || candidate.score > best_candidate.score) {
+			found = true;
+			best_candidate = candidate;
+		}
+	}
+
+	if (!found) {
+		stage2_two_perturb_false_count++;
+		return false;
+	}
+
+	if (reduction) {
+		color_node_reduction(best_candidate.v, best_candidate.b);
+		color_node_reduction(best_candidate.u, best_candidate.a);
+	} else {
+		color_node(best_candidate.v, best_candidate.b);
+		color_node(best_candidate.u, best_candidate.a);
+	}
+	current_iter++;
+	no_impr++;
+
+	stage2_two_perturb_exec_count++;
+	stage2_two_perturb_score_sum += best_candidate.score;
+	stage2_two_perturb_v_loss_sum += best_candidate.v_loss;
+	stage2_two_perturb_u_gain_sum += best_candidate.u_gain;
+	stage2_two_perturb_hidden_gain_sum += best_candidate.hidden_gain;
+	stage2_two_perturb_conflict_penalty_sum += best_candidate.conflict_penalty;
+	if (edge_conflict > 0) {
+		stage2_two_perturb_conflict_after_count++;
+	}
+
+	return true;
+}
+
+bool two_point_lookahead_perturbation_old(long bms, double conflict_weight) {
+	return two_point_lookahead_perturbation_impl(bms, conflict_weight, false);
+}
+
+bool two_point_lookahead_perturbation_reduction(long bms, double conflict_weight) {
+	return two_point_lookahead_perturbation_impl(bms, conflict_weight, true);
+}
+
 
 void read_file(string file_name){
 	ifstream in_file(file_name);
@@ -953,7 +1151,34 @@ void stage_one_step_old(){
 }
 
 bool stage_two_step_old(){
-	return false;
+	long best_node = -1;
+	long best_color = -1;
+	long x = choose_good_node(choose_conflict_node_bms,best_node,best_color);
+	if (x == 1 && best_node != -1){
+		color_node(best_node,best_color);
+		current_iter++;
+		no_impr++;
+	}
+	else{
+		remove_conflict_new4();
+	}
+
+	if (edge_conflict == 0) {
+		long score = compute_best_score();
+		double run_time = elapsed_time();
+		if (score < best_score) {
+			update_best_solution();
+			final_time = run_time;
+			no_impr = 0;
+			stage2_improve_count++;
+		}
+	}
+
+	if (edge_conflict == 0) {
+		two_point_lookahead_perturbation_old(pertub_bms, conflict_weight);
+	}
+
+	return true;
 }
 
 bool stage_three_step_old(){
@@ -1707,7 +1932,34 @@ void stage_one_step_reduction(){
 }
 
 bool stage_two_step_reduction(){
-	return false;
+	long best_node = -1;
+	long best_color = -1;
+	long x = choose_good_node_reduction(choose_conflict_node_bms,best_node,best_color);
+	if (x == 1 && best_node != -1){
+		color_node_reduction(best_node,best_color);
+		current_iter++;
+		no_impr++;
+	}
+	else{
+		remove_conflict_new4_reduction();
+	}
+
+	if (edge_conflict == 0) {
+		long score = cost + remaining_vertex.size();
+		double run_time = elapsed_time();
+		if (score < best_score) {
+			update_best_solution_reduction();
+			final_time = run_time;
+			no_impr = 0;
+			stage2_improve_count++;
+		}
+	}
+
+	if (edge_conflict == 0) {
+		two_point_lookahead_perturbation_reduction(pertub_bms, conflict_weight);
+	}
+
+	return true;
 }
 
 bool stage_three_step_reduction(){

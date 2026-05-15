@@ -242,3 +242,82 @@ stage2 stats:   triggers=2009090 moves=2771622 improve=13
 - 因此，单看“Stage2 BMS 2x 初版结果略差”会误判。真正暴露的问题是阶段边界设计不合理，以及 Stage3 未实现时不应该让搜索自然流入 Stage3。
 - 第二阶段 BMS 2x 本身不能直接判定失败；在禁用 Stage3 的临时实验中，它继续执行后确实产生更多刷新。
 - 后续不应继续只叠加 BMS 倍率调参，而应先重新设计阶段持续条件：例如在 Stage3 未实现前，让 Stage3 条件继续映射到 Stage2，或给 Stage3 明确独立逻辑和统计，避免占位阶段吞掉有效搜索时间。
+
+## 2026-05-15 第二阶段两点前瞻扰动函数
+
+当前实验分支实现“两点前瞻扰动”作为第二阶段的唯一核心差异。阶段一仍然是原版主体加原版单点扰动；阶段二沿用第一阶段主体，只在合法解后的扰动位置调用新函数：
+
+```text
+choose_good_node / choose_good_node_reduction
+-> color_node / color_node_reduction
+-> remove_conflict_new4 / remove_conflict_new4_reduction
+-> 合法解检查与 best_score 更新
+-> two_point_lookahead_perturbation / two_point_lookahead_perturbation_reduction
+```
+
+新扰动执行两个相关 move：
+
+```text
+v: a -> b
+u: d -> a
+```
+
+其中 `v` 是 BMS 随机采样到的 seed 点，`a` 是 `v` 的当前颜色，`b` 是按原版扰动方式随机选出的更高颜色；`u` 是 `v` 的邻居，`d` 是 `u` 的当前颜色。第二步让 `u` 使用 `v` 释放出来的旧颜色 `a`，把原版扰动里“邻居可能受益”的估计兑现一个强候选。
+
+BMS 的含义仍然只是 seed 点 `v` 的采样次数。每次采样随机选 `v` 和 `b`，再从 `v` 的邻居表随机起点开始顺序找第一个强候选 `u`。第一版不枚举完整 `(v,u)` 对，不找最优 `u`，不放宽弱候选，不设置接受阈值，也不 fallback 到原版扰动。
+
+强候选定义为：
+
+```text
+d = vertex_color[u]
+d > a
+color_choice[u][a] == 1
+```
+
+也就是 `u` 当前颜色高于 `a`，并且 `u` 不能使用颜色 `a` 的唯一障碍是当前颜色为 `a` 的邻居 `v`。如果一轮 `bms` 内没有找到强候选，两点扰动返回 `false`，只记录统计，不修改解状态。
+
+打分延续原版扰动思想：
+
+```text
+total_score =
+    v_loss
+  + u_gain
+  + hidden_gain
+  - conflict_penalty
+```
+
+old 路径中：
+
+```text
+v_loss = a - b
+u_gain = d - a
+```
+
+reduction 路径中使用有效代价：
+
+```text
+eff(x, c) = c + get_penalty(x, c)
+v_loss = eff(v, a) - eff(v, b)
+u_gain = eff(u, d) - eff(u, a)
+```
+
+`u_gain` 是真实执行收益，不再进入隐藏收益重复计算。冲突惩罚只惩罚 `v: a -> b` 在两步之后仍然造成的等效冲突；如果 `b == d`，需要扣除 `u` 离开颜色 `d` 对 `v` 的冲突占用影响。
+
+隐藏收益只估计两个释放颜色带来的后续机会：`v` 释放的颜色 `a` 和 `u` 释放的颜色 `d`。扫描范围是 `N(v) ∪ N(u)`，第一版不加扫描上限。对同一个潜在受益点，如果颜色 `a` 和颜色 `d` 都有机会，只取最大潜在收益，不相加。
+
+等效占用数按两步扰动完成后的局部状态计算：
+
+```text
+颜色 a: v 离开 a，u 进入 a
+颜色 d: u 离开 d；如果 b == d，还要考虑 v 进入 d
+```
+
+等效占用数为 `0` 时给完整收益，为 `1` 时给折扣收益 `/3`，大于 `1` 不计收益。`u` 不参与颜色 `a` 的隐藏收益，因为它已经真实执行了 `d -> a`；`v` 可以参与颜色 `d` 的隐藏收益估计。
+
+统计输出新增：
+
+```text
+[STAGE2_TWO_POINT] triggers=... false=... exec=... avg_score=... avg_v_loss=... avg_u_gain=... avg_hidden=... avg_conflict_penalty=... conflict_after=... improve=...
+```
+
+这些统计用于观察强候选是否稀缺、两点扰动是否经常返回 `false`、隐藏收益是否有贡献、执行后是否经常制造冲突，以及阶段二是否刷新 `best_score`。

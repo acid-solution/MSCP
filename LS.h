@@ -91,6 +91,26 @@ void print_best_score(){
 	
 	cout<<file_name << " " << best_score + remove_score << " " << final_time << " " << seed <<" "<<current_iter<<endl;
 
+    double stage2_two_exec = stage2_two_perturb_exec_count;
+    double stage2_two_triggers = stage2_two_perturb_trigger_count;
+    double stage2_two_samples = stage2_two_perturb_sample_count;
+    cerr << "[STAGE2_TWO_POINT] "
+         << "triggers=" << stage2_two_perturb_trigger_count
+         << " false=" << stage2_two_perturb_false_count
+         << " exec=" << stage2_two_perturb_exec_count
+         << " samples=" << stage2_two_perturb_sample_count
+         << " candidates=" << stage2_two_perturb_candidate_count
+         << " avg_candidates_per_trigger=" << (stage2_two_triggers > 0 ? stage2_two_perturb_candidate_count / stage2_two_triggers : 0)
+         << " candidate_hit_rate=" << (stage2_two_samples > 0 ? stage2_two_perturb_candidate_count / stage2_two_samples : 0)
+         << " avg_score=" << (stage2_two_exec > 0 ? stage2_two_perturb_score_sum / stage2_two_exec : 0)
+         << " avg_v_loss=" << (stage2_two_exec > 0 ? stage2_two_perturb_v_loss_sum / stage2_two_exec : 0)
+         << " avg_u_gain=" << (stage2_two_exec > 0 ? stage2_two_perturb_u_gain_sum / stage2_two_exec : 0)
+         << " avg_hidden=" << (stage2_two_exec > 0 ? stage2_two_perturb_hidden_gain_sum / stage2_two_exec : 0)
+         << " avg_conflict_penalty=" << (stage2_two_exec > 0 ? stage2_two_perturb_conflict_penalty_sum / stage2_two_exec : 0)
+         << " conflict_after=" << stage2_two_perturb_conflict_after_count
+         << " improve=" << stage2_improve_count
+         << endl;
+
     // // ===== push_down 测试汇总（测完可删） =====
     // cerr << "[PD_SUMMARY] " << file_name
     //      << " calls=" << pd_call_count
