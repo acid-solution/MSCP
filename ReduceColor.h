@@ -31,7 +31,7 @@ struct Stage2PerturbCandidate {
 };
 
 inline double stage2_exploration_weight() {
-	return std::max(1.0, conflict_weight);
+	return 0.1;
 }
 
 inline long stage2_age(long node) {
@@ -54,13 +54,6 @@ inline void record_recolor_history(long node) {
 		last_move_iter[node] = current_iter;
 	}
 }
-
-inline void record_stage2_move_iter(long node) {
-	if (node >= 0 && (size_t)node < last_move_iter.size()) {
-		last_move_iter[node] = current_iter;
-	}
-}
-
 
 void read_file(string file_name){
 	ifstream in_file(file_name);
@@ -626,6 +619,8 @@ bool stage2_perturbation_old(long bms, double conflict_weight){
 	long max_age = 0;
 	long min_freq = std::numeric_limits<long>::max();
 	long max_freq = 0;
+	double min_base_score = std::numeric_limits<double>::max();
+	double max_base_score = -std::numeric_limits<double>::max();
 
 	for (long i = 0; i < bms; ++i){
 		long index = rand() % remaining_vertex.size();
@@ -654,6 +649,8 @@ bool stage2_perturbation_old(long bms, double conflict_weight){
 		if (age > max_age) max_age = age;
 		if (freq < min_freq) min_freq = freq;
 		if (freq > max_freq) max_freq = freq;
+		if (choose_score < min_base_score) min_base_score = choose_score;
+		if (choose_score > max_base_score) max_base_score = choose_score;
 		stage2_perturb_sample_count++;
 	}
 
@@ -669,7 +666,10 @@ bool stage2_perturbation_old(long bms, double conflict_weight){
 			? 1.0
 			: (max_freq - candidates[i].freq) / (double)(max_freq - min_freq);
 		double exploration_score = age_norm * low_freq_norm;
-		double stage2_perturb_score = candidates[i].base_score + stage2_exploration_weight() * exploration_score;
+		double base_norm = (max_base_score == min_base_score)
+			? 0.0
+			: (candidates[i].base_score - min_base_score) / (max_base_score - min_base_score);
+		double stage2_perturb_score = base_norm + stage2_exploration_weight() * exploration_score;
 
 		if (stage2_perturb_score > best_score){
 			best_score = stage2_perturb_score;
@@ -681,7 +681,6 @@ bool stage2_perturbation_old(long bms, double conflict_weight){
 	color_node(candidates[best_index].node, candidates[best_index].color);
 	current_iter++;
 	stage2_perturb_move_count++;
-	record_stage2_move_iter(candidates[best_index].node);
 	return true;
 }
 
@@ -1070,7 +1069,6 @@ bool stage_two_step_old(){
 		current_iter++;
 		no_impr++;
 		stage2_move_count++;
-		record_stage2_move_iter(best_node);
 	}
 	else{
 		stage2_no_candidate_count++;
@@ -1733,6 +1731,8 @@ bool stage2_perturbation_reduction(long bms, double conflict_weight){
 	long max_age = 0;
 	long min_freq = std::numeric_limits<long>::max();
 	long max_freq = 0;
+	double min_base_score = std::numeric_limits<double>::max();
+	double max_base_score = -std::numeric_limits<double>::max();
 
 	for (long i = 0; i < bms; ++i){
 		long index = rand() % remaining_vertex.size();
@@ -1766,6 +1766,8 @@ bool stage2_perturbation_reduction(long bms, double conflict_weight){
 		if (age > max_age) max_age = age;
 		if (freq < min_freq) min_freq = freq;
 		if (freq > max_freq) max_freq = freq;
+		if (choose_score < min_base_score) min_base_score = choose_score;
+		if (choose_score > max_base_score) max_base_score = choose_score;
 		stage2_perturb_sample_count++;
 	}
 
@@ -1781,7 +1783,10 @@ bool stage2_perturbation_reduction(long bms, double conflict_weight){
 			? 1.0
 			: (max_freq - candidates[i].freq) / (double)(max_freq - min_freq);
 		double exploration_score = age_norm * low_freq_norm;
-		double stage2_perturb_score = candidates[i].base_score + stage2_exploration_weight() * exploration_score;
+		double base_norm = (max_base_score == min_base_score)
+			? 0.0
+			: (candidates[i].base_score - min_base_score) / (max_base_score - min_base_score);
+		double stage2_perturb_score = base_norm + stage2_exploration_weight() * exploration_score;
 
 		if (stage2_perturb_score > best_score){
 			best_score = stage2_perturb_score;
@@ -1793,7 +1798,6 @@ bool stage2_perturbation_reduction(long bms, double conflict_weight){
 	color_node_reduction(candidates[best_index].node, candidates[best_index].color);
 	current_iter++;
 	stage2_perturb_move_count++;
-	record_stage2_move_iter(candidates[best_index].node);
 	return true;
 }
 
@@ -1923,7 +1927,6 @@ bool stage_two_step_reduction(){
 		current_iter++;
 		no_impr++;
 		stage2_move_count++;
-		record_stage2_move_iter(best_node);
 	}
 	else{
 		stage2_no_candidate_count++;

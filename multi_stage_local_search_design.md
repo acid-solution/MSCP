@@ -243,11 +243,61 @@ stage2 stats:   triggers=2009090 moves=2771622 improve=13
 - 第二阶段 BMS 2x 本身不能直接判定失败；在禁用 Stage3 的临时实验中，它继续执行后确实产生更多刷新。
 - 后续不应继续只叠加 BMS 倍率调参，而应先重新设计阶段持续条件：例如在 Stage3 未实现前，让 Stage3 条件继续映射到 Stage2，或给 Stage3 明确独立逻辑和统计，避免占位阶段吞掉有效搜索时间。
 
-## 2026-05-14 第二阶段 age / vertex_freq 增强版一阶段搜索
+## 2026-05-14 阶段二 age / vertex_freq 实验总览
 
-本次第二阶段不再设计新的颜色类吸收策略，也不再单纯放大 BMS。新的第一版实现遵循更简单的原则：第二阶段照搬第一阶段的 step 结构，只替换候选 move 的评分分布。
+这一节只记录围绕 `age` / `vertex_freq` 的阶段二实验。为了避免把历史失败方案误读成当前方案，先写当前代码状态，再按时间顺序记录实验。
 
-线性版本曾直接使用：
+### 当前代码状态
+
+当前实验分支上的代码是“阶段二扰动打分版，base score 归一化，探索权重 `0.1`”：
+
+```text
+choose_good_node / choose_good_node_reduction
+-> 如果有好 move，则执行 color_node / color_node_reduction
+-> 否则 remove_conflict_new4 / remove_conflict_new4_reduction
+-> 如果 edge_conflict == 0，则检查并刷新 best_score
+-> 合法解时执行 stage2_perturbation / stage2_perturbation_reduction
+```
+
+也就是说，阶段二主 move 已经恢复为第一阶段原版 `choose_good_node*` 逻辑；`age` / `vertex_freq` 只作用在阶段二合法解后的小扰动选择上。
+
+当前扰动评分为：
+
+```cpp
+stage2_perturb_score =
+    base_norm
+    + 0.1 * exploration_score;
+```
+
+其中 `base_norm` 是本轮 BMS 扰动候选内部的 `perturb_base_score` min/max 归一化值，范围为 `[0, 1]`。探索项同样只在本轮 BMS 样本内部归一化：
+
+```cpp
+age_norm =
+    max_age == min_age
+    ? 0.0
+    : (age - min_age) / (double)(max_age - min_age);
+
+low_freq_norm =
+    max_freq == min_freq
+    ? 1.0
+    : (max_freq - freq) / (double)(max_freq - min_freq);
+
+exploration_score = age_norm * low_freq_norm;
+```
+
+这版不新增硬冲突预算，不新增候选截断，不改变第一阶段，也不再把 `conflict_weight` 乘到探索项上。`last_move_iter` 和 `vertex_freq` 由 `color_node()` / `color_node_reduction()` 内部统一维护；已经删除阶段二外部二次更新 `last_move_iter` 的逻辑，避免阶段二和阶段一的 age 记录时机不一致。
+
+Stage3 当前仍未实现。为了避免占位 Stage3 吞掉第二阶段有效搜索时间，当前阶段判断在 `no_impr >= max_no_impr_basic` 后继续执行 Stage2；等第三阶段有真实策略后，再恢复 `STAGE_THREE` 的独立调度。
+
+当前统计输出为：
+
+```text
+[STAGE2_STATS] triggers=... moves=... no_candidate=... improve=... perturb_moves=... perturb_samples=... repairs=...
+```
+
+### 实验 1：主 move 线性 age/freq
+
+第一版直接把 `age` 和 `vertex_freq` 加到阶段二主 move 评分中：
 
 ```cpp
 stage2_score =
@@ -256,9 +306,21 @@ stage2_score =
     - freq_weight * vertex_freq[node];
 ```
 
-这会让 `age` 的原始数量级随着 `current_iter` 快速放大，容易压过第一阶段原版评分，使阶段二从“原版评分上的探索偏置”变成主要按未移动时间选点。
+问题是 `age` 的原始数量级会随着 `current_iter` 快速放大，容易压过第一阶段原版评分，使阶段二从“原版评分上的探索偏置”变成主要按未移动时间选点。
 
-归一化版本改为先保留第一阶段原版评分，再在本轮 BMS 候选集合内部计算探索项。old 路径的 `base_score` 为：
+`as-22july06`、seed 1、360 秒结果：
+
+```text
+baseline: as-22july06 27597 125.46 1 50780309
+stage2:   as-22july06 27635 0.928 1 44954575
+stats:    triggers=31010990 moves=25218415 no_candidate=5792575 improve=0 samples=2261103524 repairs=3174349
+```
+
+结论：结果明显差于 baseline，且 `stage2_improve_count = 0`。这版保留为失败样本，不应在这个线性公式上继续盲目调权重。
+
+### 实验 2：主 move 样本内归一化
+
+第二版仍然改阶段二主 move 评分，但把探索项改为本轮 BMS 样本内归一化。old 路径的原版 `base_score` 为：
 
 ```cpp
 base_score =
@@ -275,65 +337,15 @@ base_score =
     + conflict_weight * (old_conflict - new_conflict);
 ```
 
-归一化探索项为：
+最终评分为：
 
 ```cpp
-age_norm =
-    max_age == min_age
-    ? 0.0
-    : (age - min_age) / (double)(max_age - min_age);
-
-low_freq_norm =
-    max_freq == min_freq
-    ? 1.0
-    : (max_freq - freq) / (double)(max_freq - min_freq);
-
-exploration_score = age_norm * low_freq_norm;
-
 stage2_score =
     base_score
     + max(1.0, conflict_weight) * exploration_score;
 ```
 
-这里冲突控制完全沿用第一阶段已有的 `conflict_weight * (old_conflict - new_conflict)`，不额外加入 `max_stage2_conflict_delta`、`damage_penalty` 或其他硬预算。也就是说，会增加冲突的 move 仍然可以参与比较，但会自然被第一阶段原有冲突项扣分。
-
-`age(node)` 使用 `current_iter - last_move_iter[node]` 懒计算，不做每轮全图递增。`vertex_freq[node]` 记录顶点真实 recolor 次数。每次 `color_node` / `color_node_reduction` 真正执行改色后都会更新这些历史状态，因此阶段二选择时看到的是阶段一、小扰动和修复动作共同留下的搜索历史。归一化只在本轮 BMS 样本内部进行，不做全图扫描，也不减少原有候选检查。
-
-阶段二执行流程仍然照搬第一阶段：
-
-```text
-choose_stage2_node / choose_stage2_node_reduction
--> 如果有候选 move，则执行 color_node / color_node_reduction
--> 否则执行 remove_conflict_new4 / remove_conflict_new4_reduction
--> 如果 edge_conflict == 0，则检查并刷新 best_score
--> 合法解时继续执行原版小扰动 perturbation / perturbation_reduction
-```
-
-候选池继续使用第一阶段的 `valid_node` / `good_node_color`，采样规模沿用 `choose_conflict_node_bms`。因此这版阶段二不是“随机乱染色”，而是在第一阶段原有好 move 候选池内，用归一化后的 `age` 和 `vertex_freq` 改变采样偏好。
-
-Stage3 当前仍未实现。为了避免占位 Stage3 吞掉第二阶段有效搜索时间，当前阶段判断在 `no_impr >= max_no_impr_basic` 后继续执行 Stage2；等第三阶段有真实策略后，再恢复 `STAGE_THREE` 的独立调度。
-
-新增统计输出：
-
-```text
-[STAGE2_STATS] triggers=... moves=... no_candidate=... improve=... samples=... repairs=...
-```
-
-这些统计只用于观察第二阶段触发次数、实际 move 次数、无候选次数、刷新次数、采样成本和冲突修复次数，避免只看最终 `best_score` 而误判阶段二是否真正工作。
-
-初次 360 秒测试使用 `as-22july06`、seed 1：
-
-```text
-baseline: as-22july06 27597 125.46 1 50780309
-stage2:   as-22july06 27635 0.928 1 44954575
-stats:    triggers=31010990 moves=25218415 no_candidate=5792575 improve=0 samples=2261103524 repairs=3174349
-```
-
-这个结果不理想：阶段二大量触发并执行了很多 move，但 `stage2_improve_count = 0`，最终 `best_score` 明显差于 baseline。当前实现可以作为 age / vertex_freq 偏置方案的第一版失败样本保留，用于后续分析；不应在这个结果上继续盲目追加参数调整。
-
-后续归一化版本只修正评分量级，不改变阶段二结构。它的目标是避免原始 `age` 数值过大导致探索项吞掉原版 `base_score`，同时继续保留第一阶段候选池、冲突项和执行流程。
-
-归一化版本 360 秒测试使用 `as-22july06`、seed 1：
+`as-22july06`、seed 1、360 秒结果：
 
 ```text
 stage2 normalized:
@@ -341,70 +353,106 @@ stage2 normalized:
 stats:    triggers=30977091 moves=25460757 no_candidate=5516334 improve=3 samples=2283976789 repairs=3436213
 ```
 
-与线性版本相比，归一化版本从 `improve=0` 改为 `improve=3`，最终 `best_score` 从 27635 改善到 27596，并略好于本轮 baseline 27597。它仍然有较高采样成本和大量阶段二触发，后续需要继续观察不同 seed / 更长时间下是否稳定。
-
-## 2026-05-14 第二阶段扰动打分版
-
-进一步讨论后，当前实验方向调整为：阶段二主 move 恢复第一阶段原版 `choose_good_node` / `choose_good_node_reduction`，不再把 `age` / `vertex_freq` 用于主 move 选择。前面的 normalized move scoring 作为历史实验记录保留，但不再作为当前方案。
-
-新的阶段二只改变合法解后的“小扰动”评分。这样更贴近平台期循环中的关键位置：
+`cnr-2000`、seed 1、360 秒结果：
 
 ```text
-小扰动 -> 修复冲突 -> 局部搜索 -> 合法解 -> 尝试刷新 best_score
+baseline: cnr-2000 731556 359.658 1 214525223
+stage2 normalized:
+          cnr-2000 731661 346.2 1 189293373
+stats:    triggers=130371390 moves=122219195 no_candidate=8152195 improve=12 samples=1216612276 repairs=5621538
 ```
 
-阶段二执行流程改为：
+结论：`as-22july06` 上略好于本轮 baseline，但 `cnr-2000` 上变差。因此不能把单个实例上的 1 分改进当成稳定有效。
 
-```text
-choose_good_node / choose_good_node_reduction
--> 如果有好 move，则执行 color_node / color_node_reduction
--> 否则 remove_conflict_new4 / remove_conflict_new4_reduction
--> 如果 edge_conflict == 0，则检查并刷新 best_score
--> 合法解时执行 stage2_perturbation / stage2_perturbation_reduction
-```
+### 实验 3：扰动打分，base score 未归一化
 
-阶段二扰动候选生成完全照搬原版扰动：采样 `remaining_vertex`、保持原版 `new_color` 生成方式、保留原版邻居潜力项和冲突惩罚。唯一变化是最终评分在原版扰动分数上加入本轮 BMS 样本内归一化探索项：
+随后把阶段二主 move 恢复为第一阶段原版 `choose_good_node*`，只改合法解后的小扰动评分。此时扰动候选生成完全照搬原版扰动：采样 `remaining_vertex`，保持原版 `new_color` 生成方式，保留原版邻居潜力项和冲突惩罚。
+
+这一版的思路是：
 
 ```cpp
 stage2_perturb_score =
     perturb_base_score
-    + max(1.0, conflict_weight) * exploration_score;
+    + 0.5 * max(1.0, conflict_weight) * exploration_score;
 ```
 
-其中：
-
-```cpp
-age_norm =
-    max_age == min_age
-    ? 0.0
-    : (age - min_age) / (double)(max_age - min_age);
-
-low_freq_norm =
-    max_freq == min_freq
-    ? 1.0
-    : (max_freq - freq) / (double)(max_freq - min_freq);
-
-exploration_score = age_norm * low_freq_norm;
-```
-
-这版不新增硬冲突预算，不新增候选截断，也不改变第一阶段。统计输出增加 `perturb_moves` 和 `perturb_samples`，用于区分阶段二主 move 成本和阶段二扰动打分成本：
+`as-22july06`、seed 1、360 秒结果：
 
 ```text
-[STAGE2_STATS] triggers=... moves=... no_candidate=... improve=... perturb_moves=... perturb_samples=... repairs=...
-```
-
-360 秒测试结果：
-
-```text
-as-22july06, seed 1:
 stage2 perturb scoring:
           as-22july06 27608 63.289 1 44546804
 stats:    triggers=29985532 moves=24384042 no_candidate=5601490 improve=3 perturb_moves=16271341 perturb_samples=1464420690 repairs=3368519
+```
 
-cnr-2000, seed 1:
+`cnr-2000`、seed 1、360 秒结果：
+
+```text
 stage2 perturb scoring:
           cnr-2000 731778 343.841 1 178750856
 stats:    triggers=115429649 moves=108647817 no_candidate=6781832 improve=74 perturb_moves=51663624 perturb_samples=516636240 repairs=4587585
 ```
 
-结果信号不理想：`as-22july06` 差于 normalized move scoring 的 27596；`cnr-2000` 也差于原版 baseline 731556 和 normalized move scoring 731661。虽然 `cnr-2000` 的阶段二刷新次数达到 74 次，但最终 `best_score` 没有改善，说明“扰动打分 + age/freq 归一化”这一版不能只凭刷新次数判断有效。
+结论：两组结果都不理想。尤其 `cnr-2000` 虽然 `improve=74`，最终 `best_score` 仍差于 baseline，说明阶段二刷新次数不能直接代表搜索质量。
+
+### 实验 4：扰动打分，base score 归一化，探索权重 0.5
+
+为避免 `perturb_base_score` 的原始量级压过探索项，进一步把原版扰动分数也在本轮 BMS 样本内部归一化：
+
+```cpp
+stage2_perturb_score =
+    base_norm
+    + 0.5 * exploration_score;
+```
+
+`as-22july06`、seed 1、360 秒结果：
+
+```text
+stage2 perturb normalized-base w=0.5:
+          as-22july06 27635 1.032 1 43391084
+stats:    triggers=28161748 moves=22522296 no_candidate=5639452 improve=0 perturb_moves=18218552 perturb_samples=1639669680 repairs=2442271
+```
+
+`cnr-2000`、seed 1、360 秒结果：
+
+```text
+stage2 perturb normalized-base w=0.5:
+          cnr-2000 731947 296.602 1 195129946
+stats:    triggers=127420402 moves=121242403 no_candidate=6177999 improve=53 perturb_moves=58220785 perturb_samples=582207850 repairs=3927844
+```
+
+结论：继续变差。把原版扰动分数完全归一化后，可能削弱了原始扰动评分中的绝对差异，使原版扰动偏好被压平。
+
+### 实验 5：扰动打分，base score 归一化，探索权重 0.1
+
+当前代码把实验 4 的探索权重从 `0.5` 降到 `0.1`：
+
+```cpp
+stage2_perturb_score =
+    base_norm
+    + 0.1 * exploration_score;
+```
+
+`as-22july06`、seed 1、360 秒结果：
+
+```text
+stage2 perturb normalized-base w=0.1:
+          as-22july06 27635 1.061 1 45986716
+stats:    triggers=31699618 moves=25198255 no_candidate=6501363 improve=0 perturb_moves=16871098 perturb_samples=1518398820 repairs=3709398
+```
+
+`cnr-2000`、seed 1、360 秒结果：
+
+```text
+stage2 perturb normalized-base w=0.1:
+          cnr-2000 731827 356.375 1 195782341
+stats:    triggers=127773483 moves=120211869 no_candidate=7561614 improve=66 perturb_moves=57413237 perturb_samples=574132370 repairs=5082079
+```
+
+结论：`cnr-2000` 相比 `w=0.5` 有所改善，但仍差于原版 baseline 731556，也差于主 move 归一化实验的 731661。`as-22july06` 仍然没有阶段二刷新。当前信号说明：单纯降低探索项权重不能解决 base score 归一化后原版扰动差异被压平的问题。
+
+### 当前阶段结论
+
+- 当前代码不是最佳实验结果，只是最新一版“扰动打分 + base 归一化 + 探索权重 0.1”。
+- 到目前为止，最值得保留观察的是“主 move 样本内归一化”：它在 `as-22july06` 上略好于 baseline，但在 `cnr-2000` 上变差。
+- 扰动打分方向连续几版都不稳定，尤其 base score 完全归一化后，原版扰动评分的绝对差异可能被压平。
+- 后续不应继续盲目调 `0.1 / 0.5` 这类权重。更合理的下一步是先决定是否回到主 move 归一化方案，或设计一种只在原版扰动分数接近时才使用探索项的 tie-break / near-tie 机制。
