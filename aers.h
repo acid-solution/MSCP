@@ -16,6 +16,7 @@ void aers_build_region(long seed);
 void aers_record_success();
 
 long aers_mode = 0;
+long aers_diag = 0;
 long aers_active = 0;
 long aers_inline_sync = 0;
 long aers_search_used = 0;
@@ -81,32 +82,32 @@ clock_t aers_stop_region_exclusive_ticks = 0;
 
 // 如果本次 moved node 是 active boundary，就从它开始增量扩张当前区域。
 void aers_expand_from_moved_boundary(long moved_node) {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     if (moved_node < 0 || moved_node >= (long)aers_boundary_active_mark.size()) {
-        aers_move_boundary_stale++;
+        aers_diag_inc(aers_move_boundary_stale);
         aers_add_ticks(aers_expand_exclusive_ticks, start_clock);
         return;
     }
     if (!aers_in_region(moved_node)) {
-        aers_move_boundary_stale++;
+        aers_diag_inc(aers_move_boundary_stale);
         aers_remove_boundary_active(moved_node);
         aers_add_ticks(aers_expand_exclusive_ticks, start_clock);
         return;
     }
     if (aers_boundary_exhausted_mark[moved_node] == aers_region_stamp) {
-        aers_move_boundary_skip_exhausted++;
+        aers_diag_inc(aers_move_boundary_skip_exhausted);
         aers_remove_boundary_active(moved_node);
         aers_add_ticks(aers_expand_exclusive_ticks, start_clock);
         return;
     }
     if (aers_boundary_active_mark[moved_node] != aers_region_stamp) {
-        aers_move_boundary_invariant_miss++;
+        aers_diag_inc(aers_move_boundary_invariant_miss);
         aers_add_ticks(aers_expand_exclusive_ticks, start_clock);
         return;
     }
 
-    aers_expand_calls++;
-    aers_move_boundary_expand_calls++;
+    aers_diag_inc(aers_expand_calls);
+    aers_diag_inc(aers_move_boundary_expand_calls);
 
     long added = 0;
     while (added < aers_boundary_expand_size) {
@@ -125,7 +126,7 @@ void aers_expand_from_moved_boundary(long moved_node) {
         }
         if ((long)aers_region_vertices.size() > before) {
             added++;
-            aers_move_boundary_expand_added++;
+            aers_diag_inc(aers_move_boundary_expand_added);
         }
     }
 
@@ -134,9 +135,9 @@ void aers_expand_from_moved_boundary(long moved_node) {
 
 // 停止当前 AERS 区域，并设置下一次进入前的冷却。
 void aers_stop_region_reduction() {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     if (aers_active) {
-        aers_exit_count++;
+        aers_diag_inc(aers_exit_count);
         aers_cooldown_until = aers_no_impr + max_no_impr / 2;
     }
     aers_active = 0;
@@ -147,11 +148,11 @@ void aers_stop_region_reduction() {
 
 // 用 seed 顶点和它的一跳 remaining 邻居建立新 AERS 区域。
 void aers_build_region(long seed) {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     aers_clear_region();
     aers_active = 1;
     aers_seed_node = seed;
-    aers_enter_count++;
+    aers_diag_inc(aers_enter_count);
 
     aers_add_region_vertex(seed);
     for (long v : temp_adjacency_list[seed]) {
@@ -163,7 +164,7 @@ void aers_build_region(long seed) {
 
 // 提交 reduction move，并临时打开 AERS active 池内联同步。
 bool aers_color_node_reduction(long node, long color, bool lock_it) {
-    aers_commit_wrapper_calls++;
+    aers_diag_inc(aers_commit_wrapper_calls);
     aers_inline_sync = 1;
     bool ok = color_node_reduction(node, color, lock_it);
     aers_inline_sync = 0;
@@ -204,17 +205,17 @@ bool aers_update_region_reduction() {
 void aers_after_region_move_reduction(long moved_node, bool expand_boundary) {
     if (!aers_active) return;
 
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     aers_region_no_impr++;
-    aers_total_region_iter++;
-    aers_total_region_size += (long long)aers_region_vertices.size();
+    aers_diag_inc(aers_total_region_iter);
+    aers_diag_add(aers_total_region_size, (long long)aers_region_vertices.size());
     aers_add_ticks(aers_after_move_exclusive_ticks, start_clock);
 
     if (expand_boundary) {
         aers_expand_from_moved_boundary(moved_node);
     }
 
-    start_clock = clock();
+    start_clock = aers_diag_clock();
     bool should_stop_region = aers_region_no_impr >= max_no_impr / 4;
     aers_add_ticks(aers_after_move_exclusive_ticks, start_clock);
 
@@ -226,7 +227,7 @@ void aers_after_region_move_reduction(long moved_node, bool expand_boundary) {
 // 记录 active 区域内找到新 best，并重置区域停滞计数。
 void aers_record_success() {
     if (!aers_active) return;
-    aers_success_count++;
+    aers_diag_inc(aers_success_count);
     aers_region_no_impr = 0;
 }
 

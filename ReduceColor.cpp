@@ -19,8 +19,9 @@ int main(int argc, char* argv[]){
 	big_pertub_mode = 0; 
 	//0=原版扰动,1=chain扰动
 	pertubation_mode = 0;
-	aers_mode = 1;
+	aers_mode = 0;
 	if (getenv("AERS_MODE") != NULL) aers_mode = atoi(getenv("AERS_MODE"));
+	if (getenv("AERS_DIAG") != NULL) aers_diag = atoi(getenv("AERS_DIAG"));
 	if (getenv("REDUCTION_MODE") != NULL) reduction_mode = atoi(getenv("REDUCTION_MODE"));
 
 

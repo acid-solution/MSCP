@@ -2,7 +2,20 @@
 
 // 把本次测得的 AERS 增量耗时累计到指定计数器。
 inline void aers_add_ticks(clock_t& bucket, clock_t start_clock) {
+    if (!aers_diag) return;
     bucket += clock() - start_clock;
+}
+
+inline clock_t aers_diag_clock() {
+    return aers_diag ? clock() : 0;
+}
+
+inline void aers_diag_inc(long long& bucket) {
+    if (aers_diag) bucket++;
+}
+
+inline void aers_diag_add(long long& bucket, long long delta) {
+    if (aers_diag) bucket += delta;
 }
 
 // 汇总默认诊断中互不重叠的 AERS 增量耗时。
@@ -158,7 +171,7 @@ void aers_sync_active_vertex(long v) {
 
 // color_node 更新邻居时调用的轻量 AERS 同步入口，只统计调用次数。
 inline void aers_inline_sync_active_vertex(long v) {
-    aers_inline_sync_call_count++;
+    aers_diag_inc(aers_inline_sync_call_count);
     aers_sync_active_vertex(v);
 }
 
@@ -190,7 +203,7 @@ void aers_add_boundary_active(long v) {
 void aers_mark_boundary_exhausted(long v) {
     if (v < 0 || v >= (long)aers_boundary_exhausted_mark.size()) return;
     if (aers_boundary_exhausted_mark[v] != aers_region_stamp) {
-        aers_boundary_exhausted_count++;
+        aers_diag_inc(aers_boundary_exhausted_count);
     }
     aers_boundary_exhausted_mark[v] = aers_region_stamp;
     aers_remove_boundary_active(v);
@@ -210,27 +223,27 @@ void aers_add_region_vertex(long v) {
 // 推进一个 boundary 顶点，直到加入一个外部邻居或扫描耗尽。
 bool aers_advance_boundary_vertex(long v) {
     if (!aers_in_region(v)) {
-        aers_boundary_advance_stale++;
+        aers_diag_inc(aers_boundary_advance_stale);
         return false;
     }
     if (aers_boundary_exhausted_mark[v] == aers_region_stamp) {
-        aers_boundary_advance_skip_exhausted++;
+        aers_diag_inc(aers_boundary_advance_skip_exhausted);
         return false;
     }
 
     long& idx = aers_boundary_next_index[v];
     while (idx < (long)temp_adjacency_list[v].size()) {
         long u = temp_adjacency_list[v][idx++];
-        aers_scan_edges++;
+        aers_diag_inc(aers_scan_edges);
 
         if (!aers_remaining_vertex(u)) continue;
         if (aers_in_region(u)) {
-            aers_skip_marked++;
+            aers_diag_inc(aers_skip_marked);
             continue;
         }
 
         aers_add_region_vertex(u);
-        aers_expand_added++;
+        aers_diag_inc(aers_expand_added);
         if (idx < (long)temp_adjacency_list[v].size()) {
             aers_add_boundary_active(v);
         } else {
@@ -256,7 +269,7 @@ void aers_clear_region() {
 
 // 将 AERS 指标汇总输出到 stderr，不改变原 cout 结果格式。
 void print_aers_metrics() {
-    if (aers_mode == 0 || !aers_search_used) return;
+    if (aers_mode == 0 || !aers_diag || !aers_search_used) return;
 
     double elapsed = (double)(clock() - begin_time) / CLOCKS_PER_SEC;
     clock_t measured_extra_ticks = aers_measured_extra_exclusive_ticks();
@@ -316,7 +329,7 @@ void print_aers_metrics() {
 
 // 从带索引的顶点池中用 BMS 打分选择 reduction 扰动 move。
 bool aers_choose_perturb_move(Vertex_vec_with_index& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     if (pool.empty()) {
         aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
         return false;
@@ -368,7 +381,7 @@ bool aers_choose_perturb_move(Vertex_vec_with_index& pool, long bms,double confl
 
 // 从 vector 顶点池中用 BMS 打分选择 reduction 扰动 move。
 bool aers_choose_perturb_move(vector<long>& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     if (pool.empty()) {
         aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
         return false;
@@ -420,24 +433,24 @@ bool aers_choose_perturb_move(vector<long>& pool, long bms,double conflict_weigh
 
 // 从区域 good move 池中选择最好的 reduction good move。
 long aers_choose_good_node_reduction(long bms, long& BestNode, long& BestColor) {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     long best_node = -1;
     long best_color = -1;
     double best_color_score = -std::numeric_limits<double>::max();
 
     // 给一个区域 good move 候选打分，并更新当前最优 move。
     auto inspect_candidate = [&](long node) {
-        aers_choose_samples++;
+        aers_diag_inc(aers_choose_samples);
         if (!aers_in_region(node) || good_node_color[node].empty()) {
-            aers_choose_skip_empty_good++;
-            aers_good_pool_stale++;
+            aers_diag_inc(aers_choose_skip_empty_good);
+            aers_diag_inc(aers_good_pool_stale);
             aers_sync_active_vertex(node);
             return;
         }
 
         long new_color = good_node_color[node][rand() % good_node_color[node].size()];
         if (is_lock(node, new_color)) {
-            aers_choose_skip_locked++;
+            aers_diag_inc(aers_choose_skip_locked);
             return;
         }
 
@@ -481,14 +494,14 @@ long aers_choose_good_node_reduction(long bms, long& BestNode, long& BestColor) 
 
 // 在 reduction 路径中只用区域冲突池修复一个冲突。
 bool aers_remove_conflict_reduction() {
-    clock_t start_clock = clock();
+    clock_t start_clock = aers_diag_clock();
     while (!aers_region_conflict_vertices.empty()) {
         long node = aers_region_conflict_vertices[rand() % aers_region_conflict_vertices.size()];
-        aers_remove_samples++;
+        aers_diag_inc(aers_remove_samples);
 
         if (!aers_in_region(node) || conflict_vertex_in_color[node] <= 0) {
-            aers_remove_sample_miss++;
-            aers_conflict_pool_stale++;
+            aers_diag_inc(aers_remove_sample_miss);
+            aers_diag_inc(aers_conflict_pool_stale);
             aers_sync_active_vertex(node);
             continue;
         }
