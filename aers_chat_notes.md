@@ -35,7 +35,7 @@ remove_num == 0
 ```text
 当前不在 AERS
 当前无冲突
-AERS 停滞超过 max_no_impr / 2
+AERS 停滞超过 aers_max_no_impr / 2
 冷却期已过
 能用原版扰动逻辑选出 seed move
 ```
@@ -43,11 +43,13 @@ AERS 停滞超过 max_no_impr / 2
 当前默认值：
 
 ```text
-max_no_impr = 100000
+aers_max_no_impr = 100000
 进入阈值 = 50000
 ```
 
-注意：如果 big perturbation 触发过，`max_no_impr` 会按 Luby 序列变化，所以进入阈值也会跟着变。
+注意：AERS 现在维护自己的 `aers_max_no_impr`，进入阈值不再受大扰动的 Luby 序列影响。
+
+全局 big perturbation 仍然可能调整全局 `max_no_impr`，但这个值不再参与 AERS 的进入、退出和冷却判断。
 
 big perturbation 调整 `max_no_impr` 的条件是：
 
@@ -217,7 +219,7 @@ aers_boundary_expand_size = 50
 退出条件：
 
 ```text
-区域停滞达到 max_no_impr / 4
+区域停滞达到 aers_max_no_impr / 4
 区域扰动失败
 区域修冲突失败
 seed move 执行失败
@@ -226,7 +228,7 @@ seed move 执行失败
 当前默认值：
 
 ```text
-max_no_impr = 100000
+aers_max_no_impr = 100000
 区域退出阈值 = 25000
 ```
 
@@ -245,7 +247,7 @@ max_no_impr = 100000
 退出后设置：
 
 ```text
-cooldown_until = 当前 aers_no_impr + max_no_impr / 2
+cooldown_until = 当前 aers_no_impr + aers_max_no_impr / 2
 ```
 
 当前默认冷却长度：
@@ -256,7 +258,7 @@ cooldown_until = 当前 aers_no_impr + max_no_impr / 2
 
 也就是退出后至少还要再经历约 50000 次 AERS 视角下的无改进计数，才允许再次进入。
 
-如果 `max_no_impr` 被 big perturbation 改过，冷却长度也会随之变化。
+大扰动的 Luby 序列只影响全局 `max_no_impr`，不会改变 AERS 冷却长度。
 
 ## 10. 诊断开关
 
@@ -321,7 +323,7 @@ AERS_MODE
 
 ## 总结
 
-全局无冲突且停滞超过 `max_no_impr / 2` 后，用原版扰动逻辑选 seed，以 `seed + 一跳 remaining 邻居` 建区域。
+全局无冲突且停滞超过 `aers_max_no_impr / 2` 后，用原版扰动逻辑选 seed，以 `seed + 一跳 remaining 邻居` 建区域。
 
 区域内维护 good 池、conflict 池、boundary 池，后续 good move、冲突修复、扰动都限制在区域内。
 
@@ -331,6 +333,6 @@ AERS_MODE
 
 找到新 best 不退出，只重置区域停滞。
 
-区域停滞到 `max_no_impr / 4` 或区域操作失败就退出，并冷却 `max_no_impr / 2` 后才能再次进入。
+区域停滞到 `aers_max_no_impr / 4` 或区域操作失败就退出，并冷却 `aers_max_no_impr / 2` 后才能再次进入。
 
 `AERS_DIAG` 只控制诊断统计和 `AERS_SUMMARY` 输出，不改变 AERS 搜索行为。

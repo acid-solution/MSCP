@@ -83,6 +83,7 @@ void aers_init_storage() {
     aers_no_impr = 0;
     aers_region_no_impr = 0;
     aers_cooldown_until = 0;
+    aers_max_no_impr = max_no_impr_basic;
     aers_seed_node = -1;
 }
 

@@ -242,7 +242,7 @@ bool aers_start_region(long bms, double conflict_weight) {
 bool aers_update_region() {
     if (aers_mode == 0 || aers_active) return false;
     if (edge_conflict != 0) return false;
-    if (aers_no_impr <= max_no_impr / 2) return false;
+    if (aers_no_impr <= aers_max_no_impr / 2) return false;
     if (aers_no_impr < aers_cooldown_until) return false;
     return aers_start_region(pertub_bms, conflict_weight);
 }

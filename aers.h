@@ -23,6 +23,7 @@ long aers_search_used = 0;
 long aers_no_impr = 0;
 long aers_region_no_impr = 0;
 long aers_cooldown_until = 0;
+long aers_max_no_impr = max_no_impr_basic;
 long aers_boundary_expand_size = 50;
 long aers_seed_node = -1;
 
@@ -138,7 +139,7 @@ void aers_stop_region_reduction() {
     clock_t start_clock = aers_diag_clock();
     if (aers_active) {
         aers_diag_inc(aers_exit_count);
-        aers_cooldown_until = aers_no_impr + max_no_impr / 2;
+        aers_cooldown_until = aers_no_impr + aers_max_no_impr / 2;
     }
     aers_active = 0;
     aers_inline_sync = 0;
@@ -196,7 +197,7 @@ bool aers_start_region_reduction(long bms, double conflict_weight) {
 bool aers_update_region_reduction() {
     if (aers_mode == 0 || aers_active) return false;
     if (edge_conflict != 0) return false;
-    if (aers_no_impr <= max_no_impr / 2) return false;
+    if (aers_no_impr <= aers_max_no_impr / 2) return false;
     if (aers_no_impr < aers_cooldown_until) return false;
     return aers_start_region_reduction(pertub_bms, conflict_weight);
 }
@@ -216,7 +217,7 @@ void aers_after_region_move_reduction(long moved_node, bool expand_boundary) {
     }
 
     start_clock = aers_diag_clock();
-    bool should_stop_region = aers_region_no_impr >= max_no_impr / 4;
+    bool should_stop_region = aers_region_no_impr >= aers_max_no_impr / 4;
     aers_add_ticks(aers_after_move_exclusive_ticks, start_clock);
 
     if (should_stop_region) {
