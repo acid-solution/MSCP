@@ -1,508 +1,336 @@
-# AERS 讨论与实验记录
+# 第一版 AERS
 
-本文件整理本次 Codex 会话中关于 AERS 的设计、实现、测试和结论。它不是逐字聊天记录，而是面向后续继续实验的决策日志。
+## 1. 启用方式
 
-## 背景
-
-目标是在 MSCP reduction 局部搜索中实现 AERS：Adaptive Expanding Region Sampling。
-
-AERS 的初始定位是：
-
-- 不新增搜索算子。
-- 不改 old 版局部搜索。
-- 不替换全局结构。
-- move 仍通过 `color_node_reduction()` 提交。
-- 全局 `cost`、`color_choice`、`good_node_color`、`conflict_node_queue` 等结构继续共享。
-- 默认不新增命令行参数，通过代码里的 `aers_mode` 手动开关。
-
-当前源码中：
-
-- `ReduceColor.cpp` 里 `aers_mode = 1`。
-- 新增文件：`MSCP/aers.h`。
-- `ReduceColor.h` 顶部包含 `#include "aers.h"`。
-- summary 输出写到 `cerr`，不改变原始 `cout` 结果格式。
-
-## 当前 AERS 总体流程
-
-当前版本大致流程：
-
-1. 只在合法解阶段触发 AERS。
-2. 从全局 `remaining_vertex` 选择扰动 move。
-3. 以扰动点和一跳邻居建立初始区域。
-4. 提交扰动后进入区域搜索。
-5. 区域内使用精确 active 池选择 good/conflict 点。
-6. 找到新 best 后不退出 AERS，继续在当前区域深搜。
-7. 当前区域长期没有新 best 后退出并换区域。
-8. 区域扩张使用 boundary active 池，而不是从 move 点盲扩。
-
-触发条件：
+启用条件：
 
 ```text
-edge_conflict == 0
-aers_no_impr > max_no_impr / 2
-aers_no_impr >= aers_cooldown_until
+AERS_MODE != 0
 ```
 
-区域退出条件：
+有约简时走 reduction AERS。
+
+无约简时走 old AERS。
+
+更准确地说，程序先执行约简：
 
 ```text
-aers_region_no_impr >= max_no_impr / 4
+reduction(reduction_mode)
 ```
 
-best 更新后：
+如果最终：
 
 ```text
-aers_success_count++
-aers_region_no_impr = 0
-不退出 AERS
+remove_num == 0
 ```
 
-## 当前核心数据结构
+就走 old AERS。
 
-### 区域集合
+如果确实有点被约简掉，就走 reduction AERS。
 
-```cpp
-vector<long> aers_region_vertices;
-vector<int> aers_region_mark;
-long aers_region_stamp;
-```
+## 2. 进入方式
 
-### 精确区域 active 池
-
-当前不再从整个区域盲抽，而是维护两个精确池：
-
-```cpp
-vector<long> aers_region_good_vertices;
-vector<long> aers_region_conflict_vertices;
-vector<int> aers_good_pool_mark;
-vector<int> aers_conflict_pool_mark;
-vector<long> aers_good_pool_pos;
-vector<long> aers_conflict_pool_pos;
-```
-
-含义：
+进入条件：
 
 ```text
-aers_region_good_vertices:
-    区域内 good_node_color[v] 非空的点
-
-aers_region_conflict_vertices:
-    区域内 conflict_vertex_in_color[v] > 0 的点
+当前不在 AERS
+当前无冲突
+AERS 停滞超过 max_no_impr / 2
+冷却期已过
+能用原版扰动逻辑选出 seed move
 ```
 
-相关函数：
-
-```cpp
-aers_add_good_active()
-aers_remove_good_active()
-aers_add_conflict_active()
-aers_remove_conflict_active()
-aers_sync_active_vertex()
-aers_sync_active_around_vertex()
-```
-
-当前每次区域 move 后会同步 `node + node 的区域内邻居`。
-
-这个改动有效降低了 miss：
+当前默认值：
 
 ```text
-remove_sample_miss = 0
-choose_skip_empty_good 很低
+max_no_impr = 100000
+进入阈值 = 50000
 ```
 
-### boundary active 池
+注意：如果 big perturbation 触发过，`max_no_impr` 会按 Luby 序列变化，所以进入阈值也会跟着变。
 
-当前扩张不再从 move 点直接扩，而是维护 boundary 池：
-
-```cpp
-vector<long> aers_boundary_active_vertices;
-vector<int> aers_boundary_active_mark;
-vector<long> aers_boundary_active_pos;
-vector<int> aers_boundary_scan_mark;
-vector<int> aers_boundary_exhausted_mark;
-vector<long> aers_boundary_next_index;
-```
-
-相关函数：
-
-```cpp
-aers_add_boundary_active()
-aers_remove_boundary_active()
-aers_mark_boundary_exhausted()
-aers_advance_boundary_vertex()
-aers_expand_from_boundary_pool()
-```
-
-当前扩张方式：
+big perturbation 调整 `max_no_impr` 的条件是：
 
 ```text
-从 boundary pool 随机抽一个点
-推进它的 next_index，跳过不在 remaining 或已在区域的邻居
-如果找到区域外邻居，就加入一个点
-如果该 boundary 点还没扫完，则重新放回 boundary pool
-每次区域 move 后最多扩张 aers_boundary_expand_size = 50 个点
+vertex_count < 100000
+no_impr > max_no_impr
 ```
 
-注意：曾尝试“确认入池 + 单个 boundary 连续吸收邻居”的版本，质量和迭代都不理想，已回退。
-
-## 已尝试方案与结论
-
-### 1. 初始 BFS / 候选池扩张
-
-最初 AERS 是停滞时建立 BFS 局部区域，choose/remove/perturb 从区域采样。
-
-问题：
-
-- BFS 和扩张扫描开销偏大。
-- 区域里多数点没有 good/conflict，采样命中低。
-- 后来转为“合法解阶段扰动建区域”。
-
-### 2. 合法解触发 + 扰动影响区
-
-改为：
+seed 选择：
 
 ```text
-合法解停滞
--> 全局选择扰动点
--> 扰动点 + 一跳邻居建初始区域
--> 区域修复
+用原版扰动的同一套逻辑选 seed move
 ```
 
-这个方向更符合直觉：合法解阶段本来 good move 少，AERS 应该靠扰动制造局部修复结构。
-
-### 3. best 后不退出 AERS
-
-原先找到一次新 best 就退出 AERS。
-
-后来改为：
+AERS 的区别是：
 
 ```text
-找到 best 不退出
-继续压榨当前区域
-直到区域 no-impr 达到阈值
+原版扰动：选完直接扰动
+AERS：选完后用这个点建区域，再执行这次扰动
 ```
 
-这个方向在 `cnr-2000` 上明显有效。
+## 3. 初始区域
 
-### 4. 惰性区域 active 池
-
-曾维护：
-
-```cpp
-aers_region_good_vertices
-aers_region_conflict_vertices
-```
-
-但只是惰性加入，抽到过期点才删除。
-
-问题：
+区域定义：
 
 ```text
-good_pool_stale 高
-conflict_pool_stale 高
-remove_sample_miss 高
+seed + seed 的一跳 remaining 邻居
 ```
 
-### 5. 精确区域 active 池
+只加入仍在当前搜索图里的点。
 
-加入 O(1) 删除位置表后，区域 active 池变精确。
+## 4. 区域内候选集维护
 
-结论：
+AERS 维护 3 个区域候选池。
 
-- `remove_sample_miss` 可降到 0。
-- `choose_skip_empty_good` 可降到很低。
-- 这是有效方向，应保留。
+### 4.1 区域 good 池
 
-### 6. 降频轻量版
-
-曾尝试：
+保存：
 
 ```text
-boundary_expand_size = 20
-boundary_expand_interval = 20
-neighbor_sync_interval = 10
+区域内 good_node_color 不为空的点
 ```
 
-结论：
+也就是区域内当前存在可改进颜色的点。
 
-- 迭代数提高。
-- 质量明显下降。
-- 这是硬截断/固定间隔类方案，不符合后续方向，已回退。
+区域内选 good move 时，只从这个池采样。
 
-### 7. soft_region_size
-
-曾尝试：
+采样规模：
 
 ```text
-soft_region_size = 5000
+choose_conflict_node_bms = 90
 ```
 
-结论：
-
-- 质量明显下降。
-- 相当于硬限制区域展开。
-- 已删除。
-- 后续不要再提或使用这类靠硬阈值省成本的方案。
-
-### 8. exhausted 标记
-
-对已扫完邻接表的 boundary 点标记 exhausted，后续不再从它扩。
-
-结论：
-
-- 有价值。
-- 不新增调参参数。
-- 可保留。
-
-### 9. boundary active 池
-
-将扩张来源从 move 点改为 boundary pool。
-
-结论：
-
-- 质量提升明显。
-- 扩张调用次数下降。
-- 但 `skip_marked / scan_edges` 仍然很高。
-- 当前主要瓶颈转移到 boundary 池 stale / next_index 过期。
-
-### 10. 确认入池 + 连续吸收
-
-尝试：
+大图 `vertex_count > 100000` 时：
 
 ```text
-新点入 boundary pool 前先确认有外部邻居
-选中一个 boundary 后连续吸收外部邻居
+choose_conflict_node_bms = 10
 ```
 
-结果不佳：
+补充：如果 BMS 采样没选出可用 move，会继续在区域 good 池里顺序扫一遍兜底，但不会回到全局 good 池。
+
+### 4.2 区域 conflict 池
+
+保存：
 
 ```text
-score = 690078
-iter  = 3125380
-avg_region_size = 119434
+区域内 conflict_vertex_in_color > 0 的点
 ```
 
-问题：
+也就是区域内当前有冲突的点。
 
-- 区域膨胀过大。
-- 迭代下降。
-- 没有真正降低 marked 扫描。
+区域内修冲突时，只从这个池随机选点。
 
-结论：已回退。
+### 4.3 区域 boundary 池
 
-## 重要测试结果
-
-### no-AERS 60 秒对照
-
-当前记住的 no-AERS 对照：
+保存：
 
 ```text
-score = 699990
-iter  = 5861741
+区域内还没扫完邻居的点
 ```
 
-### 精确 active 池 + exhausted，但无 boundary pool
+每个 boundary 点记录：
 
 ```text
-score = 693316
-iter  = 4087412
-迭代比例 ≈ 69.7%
+下次从第几个邻居继续扫
 ```
 
-### 当前 boundary-pool 版本
+扫完所有邻居后，这个点标记为 exhausted，以后不再作为扩张源。
+
+## 5. 候选集如何更新
+
+每次区域内执行 move 时：
 
 ```text
-score = 688930
-iter  = 3793330
+用 AERS 包装版 color_node 提交 move
+提交过程中同步被影响的邻居
+最后同步 moved node 自己
+如果点还在区域内，就根据当前状态更新它在 good 池、conflict 池里的归属
+如果采样时发现池里有脏点，就现场重新同步或踢掉
 ```
 
-相对 no-AERS：
+所以候选集不是每轮全量重建，而是：
 
 ```text
-score 改善 = 11060
-迭代比例 ≈ 64.7%
+区域建立时初始化一次
+之后靠 move 的局部影响增量维护
+采样遇到脏点再懒修正
 ```
 
-关键 summary：
+更准确地说，同步点嵌在 `color_node()` / `color_node_reduction()` 的原更新逻辑里。
+
+`color_node` 已经更新某个邻居或 moved node 的 good/conflict 状态后，会顺手触发 AERS active 池同步。
+
+## 6. 区域内搜索逻辑
+
+AERS active 后：
 
 ```text
-enter=16
-expand=75572
-exit=15
-success=1179
-total_region_iter=1972036
-avg_region_size=4688.77
-overhead_time=1.927
-overhead_ratio=0.0323849
-expand_calls=75572
-scan_edges=83860657
-expand_added=3778175
-skip_marked=80082129
-boundary_expand_calls=75572
-boundary_expand_added=3778175
-boundary_expand_scan_edges=83860304
-boundary_exhausted_count=3423678
-boundary_pool_samples=7201853
-boundary_pool_stale=3423678
-boundary_pool_empty=15
-choose_samples=18807554
-choose_skip_empty_good=1896
-choose_skip_locked=4913983
-remove_samples=97435
-remove_sample_miss=0
-good_pool_stale=1896
-conflict_pool_stale=0
+有区域 good move：只从区域 good 池选
+没有 good move 但有冲突：只从区域 conflict 池修
+无冲突：只在区域内做扰动
 ```
 
-### 大规模 result 文件对比
-
-比较 `reduction.txt` 与 `dp约简.txt` 的共同实例/seed：
+区域扰动采样规模：
 
 ```text
-共同可比结果：413 组
-AERS 更好：125 组
-AERS 更差：244 组
-持平：44 组
+pertub_bms = 90
 ```
 
-按实例平均：
+大图 `vertex_count > 100000` 时：
 
 ```text
-共同实例数：43 个
-AERS 平均更好：14 个
-AERS 平均更差：27 个
-基本持平：2 个
+pertub_bms = 10
 ```
 
-结论：
+注意：当前没有 boundary-priority perturb。
+
+区域扰动仍然从整个 `aers_region_vertices` 里采样。
+
+## 7. 区域扩张
+
+每次区域内 move 后：
 
 ```text
-当前 AERS 不是普适性提升。
-在 rgg 系列图上更好。
-在很多真实网络/网页/引用类图上变差。
+如果 moved node 是 active boundary，就从它继续向外扩
 ```
 
-特别差的实例包括：
+每次最多加入：
 
 ```text
-eu-2005
-web-Stanford
-coPapersDBLP
-coPapersCiteseer
-cnr-2000 在 result 文件里也变差
+aers_boundary_expand_size = 50
 ```
 
-## 明确不要再提的方向
-
-用户明确指出这些是硬截断，会影响效果，不要再作为优化建议：
+扩张方式：
 
 ```text
-失败上限
-扫描上限
-固定扩张间隔
-固定同步间隔
-区域大小上限
-move 数上限
-soft_region_size
-单点扫描 step limit
+从 moved boundary 上次停的位置继续扫邻居
+遇到区域外 remaining 点就加入区域
+每次 move 最多加 50 个
+扫完则标记 exhausted
 ```
 
-原则：
+如果 moved node 不是 active boundary，本轮不会随机从其他 boundary 补扩张。
+
+## 8. 退出方式
+
+退出条件：
 
 ```text
-不要靠人为阈值省时间。
-不要掩耳盗铃式地提前判定区域不可用。
-优化应减少重复工作、复用已有计算、改进数据结构。
+区域停滞达到 max_no_impr / 4
+区域扰动失败
+区域修冲突失败
+seed move 执行失败
 ```
 
-## 当前主要问题
-
-当前最大瓶颈：
+当前默认值：
 
 ```text
-skip_marked / scan_edges ≈ 95.5%
+max_no_impr = 100000
+区域退出阈值 = 25000
 ```
 
-解释：
+找到新 best 时：
 
 ```text
-boundary 点当初有区域外邻居；
-但随着区域扩张，这些邻居可能已经被其他 boundary 点加入区域；
-再次抽到该 boundary 点时，需要跳过大量已在区域内的 marked 邻居。
+不退出
+只清空区域停滞计数
+继续在当前区域搜
 ```
 
-当前 choose/remove miss 已基本不是主要问题：
+补充：如果区域修冲突失败，AERS 会退出当前区域，然后 fallback 执行一次全局冲突修复。
+
+## 9. 退出后冷却
+
+退出后设置：
 
 ```text
-remove_sample_miss = 0
-choose_skip_empty_good 很低
+cooldown_until = 当前 aers_no_impr + max_no_impr / 2
 ```
 
-## 后续更合理的优化方向
-
-不要再加硬阈值。更合理的方向是复用已有计算、减少重复扫描。
-
-最重要的思路：
+当前默认冷却长度：
 
 ```text
-color_node_reduction() 内部本来已经扫描 node 的邻居，
-并维护 good_node_color / conflict_vertex_in_color / valid_node / conflict_node_queue。
-当前 AERS 在 move 后又调用 aers_sync_active_around_vertex(node)，重复扫一遍邻居。
+50000
 ```
 
-下一步可考虑：
+也就是退出后至少还要再经历约 50000 次 AERS 视角下的无改进计数，才允许再次进入。
+
+如果 `max_no_impr` 被 big perturbation 改过，冷却长度也会随之变化。
+
+## 10. 诊断开关
+
+新增诊断开关：
 
 ```text
-把 AERS active 池同步挂进 color_node_reduction() 的邻居更新循环里。
-当 color_node_reduction 已经更新某个点 v 的 good/conflict 状态时，
-顺手调用 aers_sync_active_vertex(v)。
+AERS_DIAG
 ```
 
-这样不是硬截断，也不会漏同步，而是消除重复工作。
+当前默认值：
 
-类似地，boundary 状态也应尽量在已有邻居更新过程中顺手更新，而不是后续抽出来才发现过期。
-
-## 当前代码状态备注
-
-当前已回退到上一版 boundary-pool 逻辑。
-
-保留：
-
-- 精确区域 active 池。
-- boundary active 池。
-- exhausted 标记。
-- `aers_total_region_size` 改成 `long long`，防止 Windows 下 summary 溢出。
-
-已删除/回退：
-
-- `soft_region_size`。
-- 轻量降频参数。
-- 确认入池 helper。
-- 单 boundary 连续吸收。
-
-## 编译与测试命令
-
-AERS 编译：
-
-```bash
-g++ -std=c++11 -O3 ReduceColor.cpp -o ReduceColor.exe
+```text
+aers_diag = 0
 ```
 
-AERS 60 秒测试：
+也就是默认关闭诊断。
 
-```bash
-.\ReduceColor.exe ..\cnr-2000 60 1
+启用诊断：
+
+```text
+AERS_DIAG=1
 ```
 
-no-AERS 临时编译：
+关闭诊断时：
 
-```powershell
-(Get-Content .\ReduceColor.cpp) -replace 'aers_mode = 1;', 'aers_mode = 0;' | g++ -std=c++11 -O3 -x c++ -I. -o ReduceColor_noaers.exe -
+```text
+不统计 AERS 诊断计数
+不调用 AERS 诊断用 clock()
+不输出 AERS_SUMMARY
 ```
 
-no-AERS 60 秒测试：
+开启诊断时：
 
-```bash
-.\ReduceColor_noaers.exe ..\cnr-2000 60 1
+```text
+统计 AERS enter / exit / success
+统计区域大小、扩张次数、扫描边数、skip_marked
+统计 boundary / good 池 / conflict 池相关指标
+统计 AERS wrapper 和 inline sync 调用次数
+统计各类 AERS exclusive time
+输出 AERS_SUMMARY 到 stderr
 ```
 
+注意：`AERS_DIAG` 不影响搜索逻辑。
+
+也就是说：
+
+```text
+aers_no_impr / aers_region_no_impr 照常更新
+active 池同步照常执行
+边界扩张照常执行
+进入 / 退出条件照常判断
+good move / conflict repair / region perturb 的选择逻辑不变
+```
+
+`AERS_DIAG=0` 只是减少诊断开销，不是算法开关。
+
+算法开关仍然是：
+
+```text
+AERS_MODE
+```
+
+## 总结
+
+全局无冲突且停滞超过 `max_no_impr / 2` 后，用原版扰动逻辑选 seed，以 `seed + 一跳 remaining 邻居` 建区域。
+
+区域内维护 good 池、conflict 池、boundary 池，后续 good move、冲突修复、扰动都限制在区域内。
+
+每次 move 后只从被移动的 boundary 点继续向外扩，最多扩 50 个。
+
+候选池靠 move 的局部影响增量同步，采样遇到脏点再懒修正。
+
+找到新 best 不退出，只重置区域停滞。
+
+区域停滞到 `max_no_impr / 4` 或区域操作失败就退出，并冷却 `max_no_impr / 2` 后才能再次进入。
+
+`AERS_DIAG` 只控制诊断统计和 `AERS_SUMMARY` 输出，不改变 AERS 搜索行为。

@@ -6,7 +6,7 @@ int main(int argc, char* argv[]){
 	//0=tabu, 1=CC基础版, 2=CC+tabu混合, 3=CICC
 	strategy_mode = 0;
 	//0=不带约简，1=原版约简，2=dp约简
-	reduction_mode = 0;
+	reduction_mode = 2;
 	//0=贪心初始化，1=度数降序初始化，2=多次随机初始化，3=DP感知初始化
 	init_mode= 0;
 	//0=原版局部搜索，1=reduction局部搜索
@@ -19,7 +19,10 @@ int main(int argc, char* argv[]){
 	big_pertub_mode = 0; 
 	//0=原版扰动,1=chain扰动
 	pertubation_mode = 0;
-	aers_mode = 0;
+
+	aers_mode = 1;
+	aers_diag = 0;
+
 	if (getenv("AERS_MODE") != NULL) aers_mode = atoi(getenv("AERS_MODE"));
 	if (getenv("AERS_DIAG") != NULL) aers_diag = atoi(getenv("AERS_DIAG"));
 	if (getenv("REDUCTION_MODE") != NULL) reduction_mode = atoi(getenv("REDUCTION_MODE"));
