@@ -871,7 +871,6 @@ bool color_node(long node, long color, bool lock_it){
             ++old_conflict;
         } 
         if (vertex_color[v] == color) ++new_conflict;
-        if (aers_inline_sync) aers_inline_sync_active_vertex(v);
     }
 
     // 修改 5: 更新当前节点 node 的 good_node_color
@@ -896,7 +895,6 @@ bool color_node(long node, long color, bool lock_it){
     }
     
     conflict_vertex_in_color[node] = new_conflict;
-    if (aers_inline_sync) aers_inline_sync_active_vertex(node);
     edge_conflict = edge_conflict - 2*old_conflict + 2*new_conflict;
     
     vertex_color[node] = color;
@@ -1412,7 +1410,6 @@ bool color_node_reduction(long node, long color, bool lock_it){
             ++old_conflict;
         } 
         if (vertex_color[v] == color) ++new_conflict;
-        if (aers_inline_sync) aers_inline_sync_active_vertex(v);
     }
 
     // -------------------------------------------------------
@@ -1450,7 +1447,6 @@ bool color_node_reduction(long node, long color, bool lock_it){
     }
     
     conflict_vertex_in_color[node] = new_conflict;
-    if (aers_inline_sync) aers_inline_sync_active_vertex(node);
     edge_conflict = edge_conflict - 2*old_conflict + 2*new_conflict;
     
     vertex_color[node] = color;

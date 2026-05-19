@@ -18,7 +18,6 @@ void aers_record_success();
 long aers_mode = 0;
 long aers_diag = 0;
 long aers_active = 0;
-long aers_inline_sync = 0;
 long aers_search_used = 0;
 long aers_no_impr = 0;
 long aers_region_no_impr = 0;
@@ -26,17 +25,11 @@ long aers_cooldown_until = 0;
 long aers_max_no_impr = max_no_impr_basic;
 long aers_boundary_expand_size = 50;
 long aers_seed_node = -1;
+long aers_last_move_in_region = -1;
 
 vector<long> aers_region_vertices;
 vector<int> aers_region_mark;
 int aers_region_stamp = 1;
-
-vector<long> aers_region_good_vertices;
-vector<long> aers_region_conflict_vertices;
-vector<int> aers_good_pool_mark;
-vector<int> aers_conflict_pool_mark;
-vector<long> aers_good_pool_pos;
-vector<long> aers_conflict_pool_pos;
 
 vector<long> aers_boundary_active_vertices;
 vector<int> aers_boundary_active_mark;
@@ -61,15 +54,21 @@ long long aers_move_boundary_stale = 0;
 long long aers_move_boundary_skip_exhausted = 0;
 long long aers_move_boundary_invariant_miss = 0;
 long long aers_move_boundary_expand_added = 0;
-long long aers_choose_samples = 0;
-long long aers_choose_skip_empty_good = 0;
-long long aers_choose_skip_locked = 0;
-long long aers_remove_samples = 0;
-long long aers_remove_sample_miss = 0;
-long long aers_good_pool_stale = 0;
-long long aers_conflict_pool_stale = 0;
 long long aers_commit_wrapper_calls = 0;
-long long aers_inline_sync_call_count = 0;
+long long aers_good_move_total = 0;
+long long aers_good_move_in_region = 0;
+long long aers_good_move_out_region = 0;
+long long aers_conflict_repair_total = 0;
+long long aers_conflict_repair_in_region = 0;
+long long aers_conflict_repair_out_region = 0;
+long long aers_perturb_total = 0;
+long long aers_perturb_in_region = 0;
+long long aers_perturb_out_region = 0;
+long long aers_enter_valid_node_size_sum = 0;
+long long aers_enter_conflict_queue_size_sum = 0;
+long long aers_enter_region_size_sum = 0;
+long long aers_success_after_in_region_move = 0;
+long long aers_success_after_out_region_move = 0;
 clock_t aers_build_region_exclusive_ticks = 0;
 clock_t aers_expand_exclusive_ticks = 0;
 clock_t aers_choose_good_exclusive_ticks = 0;
@@ -142,7 +141,6 @@ void aers_stop_region_reduction() {
         aers_cooldown_until = aers_no_impr + aers_max_no_impr / 2;
     }
     aers_active = 0;
-    aers_inline_sync = 0;
     aers_clear_region();
     aers_add_ticks(aers_stop_region_exclusive_ticks, start_clock);
 }
@@ -159,17 +157,17 @@ void aers_build_region(long seed) {
     for (long v : temp_adjacency_list[seed]) {
         if (aers_remaining_vertex(v)) aers_add_region_vertex(v);
     }
+    aers_diag_add(aers_enter_valid_node_size_sum, (long long)valid_node.size());
+    aers_diag_add(aers_enter_conflict_queue_size_sum, (long long)conflict_node_queue.size());
+    aers_diag_add(aers_enter_region_size_sum, (long long)aers_region_vertices.size());
 
     aers_add_ticks(aers_build_region_exclusive_ticks, start_clock);
 }
 
-// 提交 reduction move，并临时打开 AERS active 池内联同步。
+// 提交 reduction move；good/conflict 候选池复用全局状态，不再做 AERS 局部同步。
 bool aers_color_node_reduction(long node, long color, bool lock_it) {
     aers_diag_inc(aers_commit_wrapper_calls);
-    aers_inline_sync = 1;
-    bool ok = color_node_reduction(node, color, lock_it);
-    aers_inline_sync = 0;
-    return ok;
+    return color_node_reduction(node, color, lock_it);
 }
 
 // 通过一次全局 seed 扰动启动 reduction AERS 区域。
@@ -189,7 +187,8 @@ bool aers_start_region_reduction(long bms, double conflict_weight) {
     current_iter++;
     no_impr++;
     aers_no_impr++;
-    aers_after_region_move_reduction(seed);
+    aers_note_perturb_move(aers_in_region(seed));
+    aers_after_region_move_reduction(seed, aers_move_can_expand_boundary(seed));
     return true;
 }
 
@@ -229,6 +228,11 @@ void aers_after_region_move_reduction(long moved_node, bool expand_boundary) {
 void aers_record_success() {
     if (!aers_active) return;
     aers_diag_inc(aers_success_count);
+    if (aers_last_move_in_region == 1) {
+        aers_diag_inc(aers_success_after_in_region_move);
+    } else if (aers_last_move_in_region == 0) {
+        aers_diag_inc(aers_success_after_out_region_move);
+    }
     aers_region_no_impr = 0;
 }
 
@@ -243,18 +247,12 @@ void localsearch_reduction_aers(int cutoff) {
         long best_color = -1;
 
         if (aers_active) {
-            long x = aers_choose_good_node_reduction(choose_conflict_node_bms, best_node, best_color);
-            if (x == 1 && best_node != -1) {
-                aers_color_node_reduction(best_node, best_color);
-                current_iter++;
-                no_impr++;
-                aers_no_impr++;
-                aers_after_region_move_reduction(best_node);
-            } else if (edge_conflict > 0) {
-                if (!aers_remove_conflict_reduction()) {
+            if (!aers_global_good_move_reduction(choose_conflict_node_bms) && edge_conflict > 0) {
+                if (!aers_global_remove_conflict_reduction()) {
                     aers_stop_region_reduction();
                     remove_conflict_new4_reduction();
                     aers_no_impr++;
+                    aers_last_move_in_region = -1;
                 }
             }
         } else {

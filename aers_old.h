@@ -1,15 +1,11 @@
+#pragma once
 
-// 提交 old-search move，并临时打开 AERS active 池内联同步。
 bool aers_color_node(long node, long color, bool lock_it) {
     aers_diag_inc(aers_commit_wrapper_calls);
-    aers_inline_sync = 1;
-    bool ok = color_node(node, color, lock_it);
-    aers_inline_sync = 0;
-    return ok;
+    return color_node(node, color, lock_it);
 }
 
-// 从带索引的顶点池中用 BMS 打分选择 old-search 扰动 move。
-bool aers_choose_perturb_move_old(Vertex_vec_with_index& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
+bool aers_choose_perturb_move_old(Vertex_vec_with_index& pool, long bms, double conflict_weight, long& BestNode, long& BestColor) {
     clock_t start_clock = aers_diag_clock();
     if (pool.empty()) {
         aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
@@ -49,14 +45,14 @@ bool aers_choose_perturb_move_old(Vertex_vec_with_index& pool, long bms,double c
         aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
         return false;
     }
+
     BestNode = best_node;
     BestColor = best_color;
     aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
     return true;
 }
 
-// 从 vector 顶点池中用 BMS 打分选择 old-search 扰动 move。
-bool aers_choose_perturb_move_old(vector<long>& pool, long bms,double conflict_weight,long& BestNode, long& BestColor) {
+bool aers_choose_perturb_move_old(vector<long>& pool, long bms, double conflict_weight, long& BestNode, long& BestColor) {
     clock_t start_clock = aers_diag_clock();
     if (pool.empty()) {
         aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
@@ -96,112 +92,63 @@ bool aers_choose_perturb_move_old(vector<long>& pool, long bms,double conflict_w
         aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
         return false;
     }
+
     BestNode = best_node;
     BestColor = best_color;
     aers_add_ticks(aers_perturb_choose_exclusive_ticks, start_clock);
     return true;
 }
 
-// 从区域 good move 池中选择最好的 old-search good move。
-long aers_choose_good_node(long bms, long& BestNode, long& BestColor) {
-    clock_t start_clock = aers_diag_clock();
+bool aers_global_good_move(long bms) {
     long best_node = -1;
     long best_color = -1;
-    double best_color_score = -std::numeric_limits<double>::max();
 
-    // 给一个 old-search 区域 good move 候选打分，并更新当前最优 move。
-    auto inspect_candidate = [&](long node) {
-        aers_diag_inc(aers_choose_samples);
-        if (!aers_in_region(node) || good_node_color[node].empty()) {
-            aers_diag_inc(aers_choose_skip_empty_good);
-            aers_diag_inc(aers_good_pool_stale);
-            aers_sync_active_vertex(node);
-            return;
-        }
+    long x = choose_good_node(bms, best_node, best_color);
+    if (x != 1 || best_node == -1) return false;
 
-        long new_color = good_node_color[node][rand() % good_node_color[node].size()];
-        if (is_lock(node, new_color)) {
-            aers_diag_inc(aers_choose_skip_locked);
-            return;
-        }
+    bool in_region = aers_in_region(best_node);
+    bool expand_boundary = aers_move_can_expand_boundary(best_node);
+    if (!aers_color_node(best_node, best_color)) return false;
 
-        long current_color = vertex_color[node];
-        double score = current_color - new_color
-            + conflict_weight * (aers_safe_color_choice(node, current_color)
-                               - aers_safe_color_choice(node, new_color));
+    current_iter++;
+    no_impr++;
+    aers_no_impr++;
+    aers_note_good_move(in_region);
+    aers_after_region_move_reduction(best_node, expand_boundary);
+    return true;
+}
 
-        if (score > best_color_score) {
-            best_color_score = score;
-            best_node = node;
-            best_color = new_color;
-        }
-    };
+bool aers_global_remove_conflict() {
+    if (edge_conflict <= 0 || conflict_node_queue.empty()) return false;
 
-    if (!aers_region_good_vertices.empty()) {
-        for (long i = 0; i < bms && !aers_region_good_vertices.empty(); ++i) {
-            long node = aers_region_good_vertices[rand() % aers_region_good_vertices.size()];
-            inspect_candidate(node);
-        }
+    long index = rand() % conflict_node_queue.size();
+    long node = conflict_node_queue[index];
+    bool in_region = aers_in_region(node);
+    bool expand_boundary = aers_move_can_expand_boundary(node);
 
-        if (best_node == -1) {
-            for (long pos = 0; pos < (long)aers_region_good_vertices.size(); ) {
-                long before_size = (long)aers_region_good_vertices.size();
-                inspect_candidate(aers_region_good_vertices[pos]);
-                if ((long)aers_region_good_vertices.size() == before_size) pos++;
+    long new_color = max_color + 1;
+    if (new_color >= COLOR_NUM) {
+        for (long i = 0; i < COLOR_NUM; i++) {
+            if (i < (long)color_choice[node].size() && color_choice[node][i] == 0) {
+                new_color = i;
+                break;
             }
         }
     }
-
-    if (best_node == -1) {
-        aers_add_ticks(aers_choose_good_exclusive_ticks, start_clock);
-        return 0;
-    }
-    BestNode = best_node;
-    BestColor = best_color;
-    aers_add_ticks(aers_choose_good_exclusive_ticks, start_clock);
-    return 1;
-}
-
-// 在 old-search 路径中只用区域冲突池修复一个冲突。
-bool aers_remove_conflict() {
-    clock_t start_clock = aers_diag_clock();
-    while (!aers_region_conflict_vertices.empty()) {
-        long node = aers_region_conflict_vertices[rand() % aers_region_conflict_vertices.size()];
-        aers_diag_inc(aers_remove_samples);
-
-        if (!aers_in_region(node) || conflict_vertex_in_color[node] <= 0) {
-            aers_diag_inc(aers_remove_sample_miss);
-            aers_diag_inc(aers_conflict_pool_stale);
-            aers_sync_active_vertex(node);
-            continue;
-        }
-
-        long new_color = max_color + 1;
-        if (new_color >= COLOR_NUM) {
-            for (long i = 0; i < COLOR_NUM; i++) {
-                if (aers_safe_color_choice(node, i) == 0) {
-                    new_color = i;
-                    break;
-                }
-            }
-        }
-        if (new_color >= COLOR_NUM) new_color = new_color % COLOR_NUM;
-
-        aers_add_ticks(aers_remove_conflict_exclusive_ticks, start_clock);
-        if (!aers_color_node(node, new_color)) return false;
-
-        current_iter++;
-        no_impr++;
-        aers_no_impr++;
-        aers_after_region_move_reduction(node);
-        return true;
+    if (new_color >= COLOR_NUM) {
+        new_color = new_color % COLOR_NUM;
     }
 
-    aers_add_ticks(aers_remove_conflict_exclusive_ticks, start_clock);
-    return false;
+    if (!aers_color_node(node, new_color)) return false;
+
+    current_iter++;
+    no_impr++;
+    aers_no_impr++;
+    aers_note_conflict_repair(in_region);
+    aers_after_region_move_reduction(node, expand_boundary);
+    return true;
 }
 
-// 从当前 AERS 区域采样并执行一个 old-search 扰动 move。
 bool aers_region_perturbation(long bms, double conflict_weight) {
     long node = -1;
     long color = -1;
@@ -209,15 +156,18 @@ bool aers_region_perturbation(long bms, double conflict_weight) {
         return false;
     }
 
+    bool in_region = aers_in_region(node);
+    bool expand_boundary = aers_move_can_expand_boundary(node);
     if (!aers_color_node(node, color)) return false;
+
     current_iter++;
     no_impr++;
     aers_no_impr++;
-    aers_after_region_move_reduction(node);
+    aers_note_perturb_move(in_region);
+    aers_after_region_move_reduction(node, expand_boundary);
     return true;
 }
 
-// 通过一次全局 seed 扰动启动 old-search AERS 区域。
 bool aers_start_region(long bms, double conflict_weight) {
     long seed = -1;
     long color = -1;
@@ -234,11 +184,11 @@ bool aers_start_region(long bms, double conflict_weight) {
     current_iter++;
     no_impr++;
     aers_no_impr++;
-    aers_after_region_move_reduction(seed);
+    aers_note_perturb_move(aers_in_region(seed));
+    aers_after_region_move_reduction(seed, aers_move_can_expand_boundary(seed));
     return true;
 }
 
-// 检查 old-search 进入条件，搜索停滞时启动 AERS。
 bool aers_update_region() {
     if (aers_mode == 0 || aers_active) return false;
     if (edge_conflict != 0) return false;
@@ -258,18 +208,12 @@ void localsearch_aers(int cutoff) {
         long best_color = -1;
 
         if (aers_active) {
-            long x = aers_choose_good_node(choose_conflict_node_bms, best_node, best_color);
-            if (x == 1 && best_node != -1) {
-                aers_color_node(best_node, best_color);
-                current_iter++;
-                no_impr++;
-                aers_no_impr++;
-                aers_after_region_move_reduction(best_node);
-            } else if (edge_conflict > 0) {
-                if (!aers_remove_conflict()) {
+            if (!aers_global_good_move(choose_conflict_node_bms) && edge_conflict > 0) {
+                if (!aers_global_remove_conflict()) {
                     aers_stop_region_reduction();
                     remove_conflict_new4();
                     aers_no_impr++;
+                    aers_last_move_in_region = -1;
                 }
             }
         } else {
@@ -321,4 +265,3 @@ void localsearch_aers(int cutoff) {
         }
     }
 }
-
