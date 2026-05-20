@@ -26,7 +26,8 @@ inline clock_t aers_measured_extra_exclusive_ticks() {
         + aers_remove_conflict_exclusive_ticks
         + aers_perturb_choose_exclusive_ticks
         + aers_after_move_exclusive_ticks
-        + aers_stop_region_exclusive_ticks;
+        + aers_stop_region_exclusive_ticks
+        + aers_infer_exclusive_ticks;
 }
 
 // 判断顶点是否仍在当前可搜索图中。
@@ -76,6 +77,9 @@ void aers_init_storage() {
     aers_region_no_impr = 0;
     aers_cooldown_until = 0;
     aers_max_no_impr = max_no_impr_basic;
+    aers_infer_interval = aers_max_no_impr / 40;
+    if (aers_infer_interval <= 0) aers_infer_interval = 1;
+    last_aers_infer_region_no_impr = 0;
     aers_seed_node = -1;
     aers_last_move_in_region = -1;
 }
@@ -176,6 +180,7 @@ void aers_clear_region() {
     aers_region_vertices.clear();
     aers_boundary_active_vertices.clear();
     aers_region_no_impr = 0;
+    last_aers_infer_region_no_impr = 0;
     aers_seed_node = -1;
     aers_last_move_in_region = -1;
     aers_next_region_stamp();
@@ -295,6 +300,14 @@ void print_aers_metrics() {
          << " avg_enter_region_size=" << avg_enter_region_size
          << " success_after_in_region_move=" << aers_success_after_in_region_move
          << " success_after_out_region_move=" << aers_success_after_out_region_move
+         << " aers_infer_attempts=" << aers_infer_attempts
+         << " aers_pull_up_attempts=" << aers_pull_up_attempts
+         << " aers_pull_up_success=" << aers_pull_up_success
+         << " aers_pull_up_gain=" << aers_pull_up_gain
+         << " aers_push_down_attempts=" << aers_push_down_attempts
+         << " aers_push_down_success=" << aers_push_down_success
+         << " aers_push_down_gain=" << aers_push_down_gain
+         << " aers_infer_exclusive_time=" << (double)aers_infer_exclusive_ticks / CLOCKS_PER_SEC
          << " aers_build_region_exclusive_time=" << (double)aers_build_region_exclusive_ticks / CLOCKS_PER_SEC
          << " aers_expand_exclusive_time=" << (double)aers_expand_exclusive_ticks / CLOCKS_PER_SEC
          << " aers_choose_good_exclusive_time=" << (double)aers_choose_good_exclusive_ticks / CLOCKS_PER_SEC
@@ -462,6 +475,50 @@ bool aers_global_remove_conflict_reduction() {
 }
 
 // 从当前 AERS 区域采样并执行一个 reduction 扰动 move。
+inline bool aers_should_try_region_inference_reduction() {
+    if (!aers_active) return false;
+    if (edge_conflict != 0) return false;
+    if (pull_up_mode != 1 && push_down_mode != 1) return false;
+    if (aers_region_no_impr < aers_infer_interval) return false;
+    return aers_region_no_impr - last_aers_infer_region_no_impr >= aers_infer_interval;
+}
+
+void aers_try_region_inference_reduction() {
+    if (!aers_should_try_region_inference_reduction()) return;
+
+    clock_t start_clock = aers_diag_clock();
+    aers_diag_inc(aers_infer_attempts);
+
+    if (pull_up_mode == 1) {
+        aers_diag_inc(aers_pull_up_attempts);
+        long before_cost = aers_diag ? cost : 0;
+        pull_up_move_reduction_aers_region();
+        if (aers_diag) {
+            long gain = before_cost - cost;
+            if (gain > 0) {
+                aers_pull_up_success++;
+                aers_pull_up_gain += gain;
+            }
+        }
+    }
+
+    if (push_down_mode == 1) {
+        aers_diag_inc(aers_push_down_attempts);
+        long before_cost = aers_diag ? cost : 0;
+        push_down_move_reduction_aers_region();
+        if (aers_diag) {
+            long gain = before_cost - cost;
+            if (gain > 0) {
+                aers_push_down_success++;
+                aers_push_down_gain += gain;
+            }
+        }
+    }
+
+    last_aers_infer_region_no_impr = aers_region_no_impr;
+    aers_add_ticks(aers_infer_exclusive_ticks, start_clock);
+}
+
 bool aers_region_perturbation_reduction(long bms, double conflict_weight) {
     long node = -1;
     long color = -1;

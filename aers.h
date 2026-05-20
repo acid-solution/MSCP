@@ -24,6 +24,8 @@ long aers_region_no_impr = 0;
 long aers_cooldown_until = 0;
 long aers_max_no_impr = max_no_impr_basic;
 long aers_boundary_expand_size = 50;
+long aers_infer_interval = 0;
+long last_aers_infer_region_no_impr = 0;
 long aers_seed_node = -1;
 long aers_last_move_in_region = -1;
 
@@ -69,6 +71,13 @@ long long aers_enter_conflict_queue_size_sum = 0;
 long long aers_enter_region_size_sum = 0;
 long long aers_success_after_in_region_move = 0;
 long long aers_success_after_out_region_move = 0;
+long long aers_infer_attempts = 0;
+long long aers_pull_up_attempts = 0;
+long long aers_pull_up_success = 0;
+long long aers_pull_up_gain = 0;
+long long aers_push_down_attempts = 0;
+long long aers_push_down_success = 0;
+long long aers_push_down_gain = 0;
 clock_t aers_build_region_exclusive_ticks = 0;
 clock_t aers_expand_exclusive_ticks = 0;
 clock_t aers_choose_good_exclusive_ticks = 0;
@@ -76,6 +85,7 @@ clock_t aers_remove_conflict_exclusive_ticks = 0;
 clock_t aers_perturb_choose_exclusive_ticks = 0;
 clock_t aers_after_move_exclusive_ticks = 0;
 clock_t aers_stop_region_exclusive_ticks = 0;
+clock_t aers_infer_exclusive_ticks = 0;
 
 #include "aers_support.h"
 #include "aers_old.h"
@@ -290,6 +300,7 @@ void localsearch_reduction_aers(int cutoff) {
 
         if (aers_active) {
             if (edge_conflict == 0) {
+                aers_try_region_inference_reduction();
                 if (!aers_region_perturbation_reduction(pertub_bms, conflict_weight)) {
                     aers_stop_region_reduction();
                 }

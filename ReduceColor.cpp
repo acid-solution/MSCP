@@ -26,6 +26,8 @@ int main(int argc, char* argv[]){
 	if (getenv("AERS_MODE") != NULL) aers_mode = atoi(getenv("AERS_MODE"));
 	if (getenv("AERS_DIAG") != NULL) aers_diag = atoi(getenv("AERS_DIAG"));
 	if (getenv("REDUCTION_MODE") != NULL) reduction_mode = atoi(getenv("REDUCTION_MODE"));
+	if (getenv("PUSH_DOWN_MODE") != NULL) push_down_mode = atoi(getenv("PUSH_DOWN_MODE"));
+	if (getenv("PULL_UP_MODE") != NULL) pull_up_mode = atoi(getenv("PULL_UP_MODE"));
 
 
 	file_name= argv[1];

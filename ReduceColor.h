@@ -1048,8 +1048,9 @@ void swap_two_color_reduction(long c1, long c2){
     }
 }
 
-void push_down_move_reduction() {
-    long sz = remaining_vertex.size();
+template <typename Pool>
+void push_down_move_reduction_from_pool(Pool& pool) {
+    long sz = (long)pool.size();
     if (sz == 0) return;
 
     if ((long)pd_tmp_cc_delta.size() < vertex_count + 1) {
@@ -1062,7 +1063,8 @@ void push_down_move_reduction() {
 
     for (long i = 0; i < sample; i++) {
         // 随机采样一个顶点（允许重复，简化实现）
-        long v = remaining_vertex[rand() % sz];
+        long v = pool[rand() % sz];
+        if (!aers_remaining_vertex(v)) continue;
 
         long c_v = vertex_color[v];
         if (c_v == 0) continue;
@@ -1115,6 +1117,14 @@ void push_down_move_reduction() {
 
 
 // ===== push_down 测试专用 wrapper（测完可删） =====
+void push_down_move_reduction() {
+    push_down_move_reduction_from_pool(remaining_vertex);
+}
+
+void push_down_move_reduction_aers_region() {
+    push_down_move_reduction_from_pool(aers_region_vertices);
+}
+
 void push_down_move_reduction_test() {
     clock_t pd_begin = clock();
     long cost_before = cost;
@@ -1919,15 +1929,17 @@ void pull_up_move() {
     }
 }
  
-void pull_up_move_reduction() {
-    long sz = remaining_vertex.size();
+template <typename Pool>
+void pull_up_move_reduction_from_pool(Pool& pool) {
+    long sz = (long)pool.size();
     if (sz == 0) return;
  
     long sample = min(sz, 500L);
  
     for (long i = 0; i < sample; ++i) {
         // 第1步：随机选种子
-        long seed = remaining_vertex[rand() % sz];
+        long seed = pool[rand() % sz];
+        if (!aers_remaining_vertex(seed)) continue;
         long seed_color = vertex_color[seed];
         if (seed_color == 0) continue;
  
@@ -2020,6 +2032,14 @@ void pull_up_move_reduction() {
         }
         color_node_reduction(seed, best_target, false);
     }
+}
+
+void pull_up_move_reduction() {
+    pull_up_move_reduction_from_pool(remaining_vertex);
+}
+
+void pull_up_move_reduction_aers_region() {
+    pull_up_move_reduction_from_pool(aers_region_vertices);
 }
 
 void pull_up_move_reduction_test() {

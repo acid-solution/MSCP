@@ -48,6 +48,8 @@ void big_pertub(long big_pert_node_num, long big_pertub_bms, double conflict_wei
 void perturbation(long pertub_bms, double conflict_weight);
 
 void pull_up_move_reduction();
+void push_down_move_reduction_aers_region();
+void pull_up_move_reduction_aers_region();
 void pull_up_move();
 void pull_up_move_reduction_test();
 void localsearch_aers(int cutoff);
