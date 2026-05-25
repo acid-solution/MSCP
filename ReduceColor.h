@@ -586,6 +586,9 @@ void big_pertub_old(long pertub_num, long bms, double conflict_weight){
 			long new_color = rand() % (max_color + 2) ;
 			//long new_color = rand() % (current_color + 1);
 			double choose_score = (current_color - new_color) ;
+			if ((size_t)new_color >= color_choice[node].size()) {
+				color_choice[node].resize(new_color + 1, 0);
+			}
 			choose_score -= color_choice[node][new_color] * conflict_weight;
 			for (auto v : temp_adjacency_list[node]){
 
@@ -1611,6 +1614,9 @@ void big_pertub_reduction(long pertub_num, long bms, double conflict_weight){
 			long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
 			double choose_score = (current_color - new_color) + penalty_diff;
 
+			if ((size_t)new_color >= color_choice[node].size()) {
+				color_choice[node].resize(new_color + 1, 0);
+			}
 			choose_score -= color_choice[node][new_color] * conflict_weight;
 			for (auto v : temp_adjacency_list[node]){
 
