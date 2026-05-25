@@ -12,9 +12,9 @@ int main(int argc, char* argv[]){
 	//0=原版局部搜索，1=reduction局部搜索
 	localsearch_mode = 1;
 	//0=不使用 push_down，1=使用 push_down
-	push_down_mode = 0; 
+	push_down_mode = 1; 
 	//0=不使用 pull_up，1=使用 pull_up
-	pull_up_mode = 0;
+	pull_up_mode = 1;
 	//0=原版大扰动
 	big_pertub_mode = 0; 
 	//0=原版扰动,1=chain扰动
