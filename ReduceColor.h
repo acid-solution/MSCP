@@ -666,6 +666,9 @@ long choose_good_node(long bms, long& BestNode, long& BestColor){//返回1表示
 		
 				
 			long current_color = vertex_color[node];
+			if ((size_t)new_color >= color_choice[node].size()) {
+				color_choice[node].resize(new_color + 1, 0);
+			}
 			double score = current_color - new_color + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);//打分函数
 
 			if (score > best_color_score){
@@ -731,7 +734,7 @@ void perturbation_old(long bms, double conflict_weight){
 
 	long best_node = -1;
 	long best_color = -1;
-	double best_choose_score = -vertex_count;
+	double best_choose_score = -std::numeric_limits<double>::max();
 
 	for (long i = 0; i < bms; ++i){ //随机采样bms次
 		long index = rand() % remaining_vertex.size();//随机选择一个剩余节点
@@ -760,6 +763,7 @@ void perturbation_old(long bms, double conflict_weight){
 		}
 	}
 	no_impr++;
+	if (best_node == -1) return;
 	color_node(best_node, best_color);
 	current_iter++;
 }
@@ -769,7 +773,7 @@ void big_pertub_old(long pertub_num, long bms, double conflict_weight){
 	for (long i = 0; i < pertub_num; ++i){
 		long best_node = -1;
 		long best_color = -1;
-		double best_choose_score = -vertex_count;
+		double best_choose_score = -std::numeric_limits<double>::max();
 		
 		long rand_color = rand() * 100 / RAND_MAX;
 		if (rand_color <= 2){
@@ -816,6 +820,7 @@ void big_pertub_old(long pertub_num, long bms, double conflict_weight){
 			}
 		}
 
+		if (best_node == -1) continue;
 		color_node(best_node, best_color);
 		current_iter++;
 	}
@@ -1723,6 +1728,9 @@ long choose_good_node_reduction(long bms, long& BestNode, long& BestColor){
 
             long current_color = vertex_color[node];
             long penalty_diff = get_penalty(node, current_color) - get_penalty(node, new_color);
+            if ((size_t)new_color >= color_choice[node].size()) {
+                color_choice[node].resize(new_color + 1, 0);
+            }
 
             double score = (current_color - new_color) + penalty_diff + conflict_weight * (color_choice[node][current_color] - color_choice[node][new_color]);
 
@@ -1746,7 +1754,7 @@ void perturbation_reduction(long bms, double conflict_weight){
 
 	long best_node = -1;
 	long best_color = -1;
-	double best_choose_score = -vertex_count;
+	double best_choose_score = -std::numeric_limits<double>::max();
 
 	for (long i = 0; i < bms; ++i){ //随机采样bms次
 		long index = rand() % remaining_vertex.size();//随机选择一个剩余节点
@@ -1780,6 +1788,7 @@ void perturbation_reduction(long bms, double conflict_weight){
 		}
 	}
 	no_impr++;
+	if (best_node == -1) return;
 	color_node_reduction(best_node, best_color);
 	current_iter++;
 }
@@ -1817,7 +1826,7 @@ void big_pertub_reduction(long pertub_num, long bms, double conflict_weight){
 		long best_node = -1;
 		long best_color = -1;
 		//long best_node_old_color = -1;
-		double best_choose_score = -vertex_count;
+		double best_choose_score = -std::numeric_limits<double>::max();
 		
 		long rand_color = rand() * 100 / RAND_MAX;
 		if (rand_color <= 2){
@@ -1869,6 +1878,7 @@ void big_pertub_reduction(long pertub_num, long bms, double conflict_weight){
 			}
 		}
 
+		if (best_node == -1) continue;
 		color_node_reduction(best_node, best_color);
 		current_iter++;
 	}
