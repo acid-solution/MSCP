@@ -25,6 +25,7 @@ int main(int argc, char* argv[]){
 
 	if (getenv("AERS_MODE") != NULL) aers_mode = atoi(getenv("AERS_MODE"));
 	if (getenv("AERS_DIAG") != NULL) aers_diag = atoi(getenv("AERS_DIAG"));
+	if (getenv("INIT_MODE") != NULL) init_mode = atoi(getenv("INIT_MODE"));
 	if (getenv("REDUCTION_MODE") != NULL) reduction_mode = atoi(getenv("REDUCTION_MODE"));
 	if (getenv("PUSH_DOWN_MODE") != NULL) push_down_mode = atoi(getenv("PUSH_DOWN_MODE"));
 	if (getenv("PULL_UP_MODE") != NULL) pull_up_mode = atoi(getenv("PULL_UP_MODE"));
@@ -43,7 +44,22 @@ int main(int argc, char* argv[]){
 	reduction(reduction_mode);
 
 	//clock_t init_time = clock();
+	if(vertex_count < 5000) init_mode = 4;
 	init_color(init_mode);
+
+	if (getenv("INIT_ONLY") != NULL && atoi(getenv("INIT_ONLY")) != 0) {
+		long init_score = compute_score_reduction() + remove_score;
+		bool init_valid = verify_solution();
+		cout << "INIT_ONLY"
+			 << " score=" << init_score
+			 << " seed=" << seed
+			 << " init_mode=" << init_mode
+			 << " colors=" << max_color + 1
+			 << " remaining=" << remaining_vertex.size()
+			 << " valid=" << (init_valid ? "PASS" : "FAIL")
+			 << endl;
+		return init_valid ? 0 : 1;
+	}
 	//test_init_effect(init_time, clock());
 
 	if(remove_num == 0) localsearch_mode = 0;//如果没有进行约简，使用原版局部搜索

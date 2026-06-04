@@ -2,6 +2,7 @@
 #include "basic.h"
 #include "util.h"
 #include "aers.h"
+#include "hesa_mis_core.h"
 
 void read_file(string file_name){
 	ifstream in_file(file_name);
@@ -428,6 +429,211 @@ void init_color_dp_aware(){
         }
         color_use_number[color]++;
     }
+
+    finalize_init();
+}
+
+static void hesa_init_error(const string& message) {
+    cout << "error hesa init: " << message << endl;
+    exit(1);
+}
+
+static vector<long> hesa_extract_mis_for_active(const vector<long>& active_vertices) {
+    int n = (int)active_vertices.size();
+    vector<long> independent_set;
+    if (n == 0) return independent_set;
+
+    vector<int> vtx_graph(n, 0);
+    vector<int> local_index(vertex_count + 1, -1);
+    vector<vector<int> > edge_storage(n, vector<int>(n, 0));
+    vector<int*> edge_rows(n, nullptr);
+
+    for (int i = 0; i < n; ++i) {
+        long v = active_vertices[i];
+        if (v < 0 || v > vertex_count) hesa_init_error("active vertex out of range");
+        local_index[v] = i;
+        vtx_graph[i] = i;
+        edge_rows[i] = edge_storage[i].data();
+    }
+
+    for (int i = 0; i < n; ++i) {
+        long v = active_vertices[i];
+        for (auto u : temp_adjacency_list[v]) {
+            if (u < 0 || u > vertex_count) continue;
+            int j = local_index[u];
+            if (j >= 0) edge_storage[i][j] = 1;
+        }
+    }
+
+    delete [] hesa_mis_core::MISet;
+    hesa_mis_core::MISet = new int[n];
+    int size_is = hesa_mis_core::MISFunc(vtx_graph.data(), n, 999999, edge_rows.data(), 1);
+
+    if (size_is <= 0 || size_is > n) {
+        delete [] hesa_mis_core::MISet;
+        hesa_mis_core::MISet = nullptr;
+        hesa_init_error("MISFunc returned invalid independent-set size");
+    }
+
+    vector<char> seen(n, 0);
+    independent_set.reserve(size_is);
+    for (int i = 0; i < size_is; ++i) {
+        int local_v = hesa_mis_core::MISet[i];
+        if (local_v < 0 || local_v >= n) {
+            delete [] hesa_mis_core::MISet;
+            hesa_mis_core::MISet = nullptr;
+            hesa_init_error("MISFunc returned vertex outside active graph");
+        }
+        if (seen[local_v]) {
+            delete [] hesa_mis_core::MISet;
+            hesa_mis_core::MISet = nullptr;
+            hesa_init_error("MISFunc returned duplicate vertex");
+        }
+        for (int j = 0; j < (int)independent_set.size(); ++j) {
+            int prev_local = local_index[independent_set[j]];
+            if (prev_local >= 0 &&
+                (edge_storage[local_v][prev_local] || edge_storage[prev_local][local_v])) {
+                delete [] hesa_mis_core::MISet;
+                hesa_mis_core::MISet = nullptr;
+                hesa_init_error("MISFunc returned non-independent vertices");
+            }
+        }
+        seen[local_v] = 1;
+        independent_set.push_back(active_vertices[local_v]);
+    }
+
+    delete [] hesa_mis_core::MISet;
+    hesa_mis_core::MISet = nullptr;
+    return independent_set;
+}
+
+static long hesa_sort_colors_non_ascending(vector<long>& candidate_color,
+                                           vector<long>& candidate_color_count,
+                                           long& candidate_max_color) {
+    vector<pair<long, long> > classes;
+    for (long c = 0; c < (long)candidate_color_count.size(); ++c) {
+        if (candidate_color_count[c] > 0) {
+            classes.push_back(make_pair(candidate_color_count[c], c));
+        }
+    }
+
+    sort(classes.begin(), classes.end(), [](const pair<long, long>& a,
+                                            const pair<long, long>& b) {
+        if (a.first != b.first) return a.first > b.first;
+        return a.second < b.second;
+    });
+
+    vector<long> color_map(candidate_color_count.size(), -1);
+    vector<long> sorted_count(vertex_count + 1, 0);
+    long score = 0;
+    for (long i = 0; i < (long)classes.size(); ++i) {
+        long old_color = classes[i].second;
+        color_map[old_color] = i;
+        sorted_count[i] = classes[i].first;
+        score += classes[i].first * (i + 1);
+    }
+
+    for (auto v : remaining_vertex) {
+        long old_color = candidate_color[v];
+        if (old_color < 0 ||
+            old_color >= (long)color_map.size() ||
+            color_map[old_color] < 0) {
+            hesa_init_error("unmapped color during HESA color sort");
+        }
+        candidate_color[v] = color_map[old_color];
+    }
+
+    candidate_color_count.swap(sorted_count);
+    candidate_max_color = classes.empty() ? -1 : (long)classes.size() - 1;
+    return score;
+}
+
+static long hesa_construct_candidate(vector<long>& candidate_color,
+                                     vector<long>& candidate_color_count,
+                                     long& candidate_max_color) {
+    candidate_color.assign(vertex_count + 1, -1);
+    candidate_color_count.assign(vertex_count + 1, 0);
+    candidate_max_color = -1;
+
+    vector<char> colored(vertex_count + 1, 0);
+    long colored_count = 0;
+    long color = 0;
+
+    while (colored_count < (long)remaining_vertex.size()) {
+        vector<long> active_vertices;
+        active_vertices.reserve(remaining_vertex.size() - colored_count);
+        for (auto v : remaining_vertex) {
+            if (!colored[v]) active_vertices.push_back(v);
+        }
+        if (active_vertices.empty()) hesa_init_error("empty active graph before all vertices colored");
+
+        vector<long> independent_set = hesa_extract_mis_for_active(active_vertices);
+        if (independent_set.empty()) hesa_init_error("empty independent set");
+
+        if ((size_t)color >= candidate_color_count.size()) {
+            candidate_color_count.resize(color + 10, 0);
+        }
+        for (auto v : independent_set) {
+            if (colored[v]) hesa_init_error("vertex colored twice");
+            colored[v] = 1;
+            candidate_color[v] = color;
+            candidate_color_count[color]++;
+            colored_count++;
+        }
+        color++;
+    }
+
+    return hesa_sort_colors_non_ascending(candidate_color,
+                                          candidate_color_count,
+                                          candidate_max_color);
+}
+
+void init_color_hesa_mis(){
+    long hesa_init_candidates = 20;
+    if (getenv("HESA_INIT_CANDIDATES") != NULL) {
+        hesa_init_candidates = atol(getenv("HESA_INIT_CANDIDATES"));
+        if (hesa_init_candidates < 1) hesa_init_candidates = 1;
+    }
+    clock_t hesa_init_begin = clock();
+
+    long best_candidate_score = std::numeric_limits<long>::max();
+    long first_candidate_score = -1;
+    long best_candidate_max_color = -1;
+    vector<long> best_candidate_color(vertex_count + 1, -1);
+    vector<long> best_candidate_count(vertex_count + 1, 0);
+
+    for (long run = 0; run < hesa_init_candidates; ++run) {
+        vector<long> candidate_color;
+        vector<long> candidate_count;
+        long candidate_max_color = -1;
+        long candidate_score = hesa_construct_candidate(candidate_color,
+                                                        candidate_count,
+                                                        candidate_max_color);
+        if (run == 0) first_candidate_score = candidate_score;
+        if (candidate_score < best_candidate_score) {
+            best_candidate_score = candidate_score;
+            best_candidate_max_color = candidate_max_color;
+            best_candidate_color.swap(candidate_color);
+            best_candidate_count.swap(candidate_count);
+        }
+    }
+
+    reset_color_assignment();
+    for (auto v : remaining_vertex) {
+        if (best_candidate_color[v] < 0) hesa_init_error("best candidate leaves vertex uncolored");
+        vertex_color[v] = best_candidate_color[v];
+    }
+    color_use_number = best_candidate_count;
+    max_color = best_candidate_max_color;
+
+    if (!verify_solution()) hesa_init_error("constructed solution is illegal");
+
+    double hesa_init_time = (double)(clock() - hesa_init_begin) / CLOCKS_PER_SEC;
+    cerr << "[HESA_INIT] candidates=" << hesa_init_candidates
+         << " first_sum=" << first_candidate_score
+         << " best_sum=" << best_candidate_score
+         << " colors=" << (max_color + 1)
+         << " time=" << hesa_init_time << "s" << endl;
 
     finalize_init();
 }

@@ -27,6 +27,8 @@ void init_color(long mode){
         init_color_multi_random();
     } else if (mode == 3) {
         init_color_dp_aware();
+    } else if (mode == 4) {
+        init_color_hesa_mis();
     } else {
         cout << "invalid init mode" << endl;
         exit(1);
