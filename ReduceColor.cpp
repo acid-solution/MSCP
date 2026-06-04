@@ -22,6 +22,8 @@ int main(int argc, char* argv[]){
 
 	aers_mode = 1;
 	aers_diag = 0;
+	small_graph_opt_mode = 1;
+	small_graph_opt_diag = 0;
 
 	if (getenv("AERS_MODE") != NULL) aers_mode = atoi(getenv("AERS_MODE"));
 	if (getenv("AERS_DIAG") != NULL) aers_diag = atoi(getenv("AERS_DIAG"));
@@ -29,6 +31,8 @@ int main(int argc, char* argv[]){
 	if (getenv("REDUCTION_MODE") != NULL) reduction_mode = atoi(getenv("REDUCTION_MODE"));
 	if (getenv("PUSH_DOWN_MODE") != NULL) push_down_mode = atoi(getenv("PUSH_DOWN_MODE"));
 	if (getenv("PULL_UP_MODE") != NULL) pull_up_mode = atoi(getenv("PULL_UP_MODE"));
+	if (getenv("SMALL_GRAPH_OPT_MODE") != NULL) small_graph_opt_mode = atoi(getenv("SMALL_GRAPH_OPT_MODE"));
+	if (getenv("SMALL_GRAPH_OPT_DIAG") != NULL) small_graph_opt_diag = atoi(getenv("SMALL_GRAPH_OPT_DIAG"));
 
 
 	file_name= argv[1];
@@ -38,13 +42,18 @@ int main(int argc, char* argv[]){
 	srand(seed);
 
 	read_file(file_name);
+	small_graph_opt_active = (small_graph_opt_mode != 0 && vertex_count < small_graph_opt_threshold) ? 1 : 0;
+	if (small_graph_opt_active) {
+		init_mode = 4;
+		push_down_mode = 2;
+		pull_up_mode = 2;
+	}
 	begin_time = clock();
 	build();
 
 	reduction(reduction_mode);
 
 	//clock_t init_time = clock();
-	if(vertex_count < 5000) init_mode = 4;
 	init_color(init_mode);
 
 	if (getenv("INIT_ONLY") != NULL && atoi(getenv("INIT_ONLY")) != 0) {

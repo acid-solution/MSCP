@@ -478,7 +478,8 @@ bool aers_global_remove_conflict_reduction() {
 inline bool aers_should_try_region_inference_reduction() {
     if (!aers_active) return false;
     if (edge_conflict != 0) return false;
-    if (pull_up_mode != 1 && push_down_mode != 1) return false;
+    if ((pull_up_mode != 1 && pull_up_mode != 2) &&
+        (push_down_mode != 1 && push_down_mode != 2)) return false;
     if (aers_region_no_impr < aers_infer_interval) return false;
     return aers_region_no_impr - last_aers_infer_region_no_impr >= aers_infer_interval;
 }
@@ -489,7 +490,7 @@ void aers_try_region_inference_reduction() {
     clock_t start_clock = aers_diag_clock();
     aers_diag_inc(aers_infer_attempts);
 
-    if (pull_up_mode == 1) {
+    if (pull_up_mode == 1 || pull_up_mode == 2) {
         aers_diag_inc(aers_pull_up_attempts);
         long before_cost = aers_diag ? cost : 0;
         pull_up_move_reduction_aers_region();
@@ -502,7 +503,7 @@ void aers_try_region_inference_reduction() {
         }
     }
 
-    if (push_down_mode == 1) {
+    if (push_down_mode == 1 || push_down_mode == 2) {
         aers_diag_inc(aers_push_down_attempts);
         long before_cost = aers_diag ? cost : 0;
         push_down_move_reduction_aers_region();

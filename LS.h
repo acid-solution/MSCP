@@ -90,6 +90,20 @@ void perturbation(long pertub_bms, double conflict_weight){
 
 void print_best_score(){
     print_aers_metrics();
+    if (small_graph_opt_diag != 0 || aers_diag != 0) {
+        cerr << "[SMALL_OPT] active=" << small_graph_opt_active
+             << " threshold=" << small_graph_opt_threshold
+             << " init_mode=" << init_mode
+             << " push_down_mode=" << push_down_mode
+             << " pull_up_mode=" << pull_up_mode
+             << " pd_full_calls=" << sg_full_push_down_calls
+             << " pd_full_scanned=" << sg_full_push_down_scanned
+             << " pd_full_time=" << sg_full_push_down_time << "s"
+             << " pu_full_calls=" << sg_full_pull_up_calls
+             << " pu_full_scanned=" << sg_full_pull_up_scanned
+             << " pu_full_time=" << sg_full_pull_up_time << "s"
+             << endl;
+    }
     // 将历史最优的合法解恢复到当前图中
     for (auto v : remaining_vertex){
         vertex_color[v] = best_solution[v];

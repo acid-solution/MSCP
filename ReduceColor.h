@@ -589,7 +589,7 @@ static long hesa_construct_candidate(vector<long>& candidate_color,
 }
 
 void init_color_hesa_mis(){
-    long hesa_init_candidates = 20;
+    long hesa_init_candidates = small_graph_opt_active ? 1 : 20;
     if (getenv("HESA_INIT_CANDIDATES") != NULL) {
         hesa_init_candidates = atol(getenv("HESA_INIT_CANDIDATES"));
         if (hesa_init_candidates < 1) hesa_init_candidates = 1;
@@ -839,7 +839,7 @@ void swap_two_color(long color_1, long color_2){
 	}
 }
 
-void push_down_move() {
+void push_down_move(bool full_scan = false) {
     long sz = remaining_vertex.size();
     if (sz == 0) return;
 
@@ -848,10 +848,11 @@ void push_down_move() {
     }
 
     // BMS 采样规模
-    long sample = std::min(sz, 500L);
+    clock_t sg_begin = full_scan ? clock() : 0;
+    long sample = full_scan ? sz : std::min(sz, 500L);
 
     for (long i = 0; i < sample; i++) {
-        long v = remaining_vertex[rand() % sz];
+        long v = full_scan ? remaining_vertex[i] : remaining_vertex[rand() % sz];
 
         long c_v = vertex_color[v];
         if (c_v == 0) continue;
@@ -898,6 +899,12 @@ void push_down_move() {
             }
         }
     }
+
+    if (full_scan) {
+        sg_full_push_down_calls++;
+        sg_full_push_down_scanned += sample;
+        sg_full_push_down_time += (double)(clock() - sg_begin) / CLOCKS_PER_SEC;
+    }
 }
 
 void update_best_solution(){
@@ -923,10 +930,14 @@ void update_best_solution(){
 
 	if (push_down_mode == 1) {
 	    push_down_move();
+	} else if (push_down_mode == 2) {
+	    push_down_move(true);
 	}
 
     if(pull_up_mode == 1){
         pull_up_move();
+    } else if (pull_up_mode == 2) {
+        pull_up_move(true);
     }
 
 
@@ -1217,6 +1228,7 @@ void tree_dp_reduction() {
             deg_queue.push_back(parent);
         }
     }
+
 }
 
 long compute_score_reduction(){//计算实际染色的分数
@@ -1257,8 +1269,14 @@ void swap_two_color_reduction(long c1, long c2){
     }
 }
 
+static void record_full_push_down_scan(long sample, clock_t sg_begin) {
+    sg_full_push_down_calls++;
+    sg_full_push_down_scanned += sample;
+    sg_full_push_down_time += (double)(clock() - sg_begin) / CLOCKS_PER_SEC;
+}
+
 template <typename Pool>
-void push_down_move_reduction_from_pool(Pool& pool) {
+void push_down_move_reduction_from_pool(Pool& pool, bool full_scan = false) {
     long sz = (long)pool.size();
     if (sz == 0) return;
 
@@ -1268,11 +1286,12 @@ void push_down_move_reduction_from_pool(Pool& pool) {
 
     // BMS 采样规模：可调参数
     // 小图（采样规模 >= 顶点数）退化为全遍历
-    long sample = std::min(sz, 500L);
+    clock_t sg_begin = full_scan ? clock() : 0;
+    long sample = full_scan ? sz : std::min(sz, 500L);
 
     for (long i = 0; i < sample; i++) {
         // 随机采样一个顶点（允许重复，简化实现）
-        long v = pool[rand() % sz];
+        long v = full_scan ? pool[i] : pool[rand() % sz];
         if (!aers_remaining_vertex(v)) continue;
 
         long c_v = vertex_color[v];
@@ -1322,16 +1341,18 @@ void push_down_move_reduction_from_pool(Pool& pool) {
             }
         }
     }
+
+    if (full_scan) record_full_push_down_scan(sample, sg_begin);
 }
 
 
 // ===== push_down 测试专用 wrapper（测完可删） =====
 void push_down_move_reduction() {
-    push_down_move_reduction_from_pool(remaining_vertex);
+    push_down_move_reduction_from_pool(remaining_vertex, push_down_mode == 2);
 }
 
 void push_down_move_reduction_aers_region() {
-    push_down_move_reduction_from_pool(aers_region_vertices);
+    push_down_move_reduction_from_pool(aers_region_vertices, push_down_mode == 2);
 }
 
 void push_down_move_reduction_test() {
@@ -1413,12 +1434,12 @@ void update_best_solution_reduction(){
         }
     }
 
-	if (push_down_mode == 1) {
+	if (push_down_mode == 1 || push_down_mode == 2) {
 	    push_down_move_reduction();
 	}
 	//push_down_move_reduction_test();
 
-    if(pull_up_mode == 1){
+    if(pull_up_mode == 1 || pull_up_mode == 2){
         pull_up_move_reduction();
     }
     // pull_up_move_reduction_test();
@@ -2043,15 +2064,16 @@ void chain_perturbation_reduction(long bms, double conflict_weight) {
     no_impr++;
 }
 
-void pull_up_move() {
+void pull_up_move(bool full_scan) {
     long sz = remaining_vertex.size();
     if (sz == 0) return;
  
-    long sample = min(sz, 500L);
+    clock_t sg_begin = full_scan ? clock() : 0;
+    long sample = full_scan ? sz : min(sz, 500L);
  
     for (long i = 0; i < sample; ++i) {
         // 第1步：随机选种子
-        long seed = remaining_vertex[rand() % sz];
+        long seed = full_scan ? remaining_vertex[i] : remaining_vertex[rand() % sz];
         long seed_color = vertex_color[seed];
         if (seed_color == 0) continue;
  
@@ -2139,18 +2161,25 @@ void pull_up_move() {
         }
         color_node(seed, best_target, false);
     }
+
+    if (full_scan) {
+        sg_full_pull_up_calls++;
+        sg_full_pull_up_scanned += sample;
+        sg_full_pull_up_time += (double)(clock() - sg_begin) / CLOCKS_PER_SEC;
+    }
 }
  
 template <typename Pool>
-void pull_up_move_reduction_from_pool(Pool& pool) {
+void pull_up_move_reduction_from_pool(Pool& pool, bool full_scan = false) {
     long sz = (long)pool.size();
     if (sz == 0) return;
  
-    long sample = min(sz, 500L);
+    clock_t sg_begin = full_scan ? clock() : 0;
+    long sample = full_scan ? sz : min(sz, 500L);
  
     for (long i = 0; i < sample; ++i) {
         // 第1步：随机选种子
-        long seed = pool[rand() % sz];
+        long seed = full_scan ? pool[i] : pool[rand() % sz];
         if (!aers_remaining_vertex(seed)) continue;
         long seed_color = vertex_color[seed];
         if (seed_color == 0) continue;
@@ -2244,14 +2273,20 @@ void pull_up_move_reduction_from_pool(Pool& pool) {
         }
         color_node_reduction(seed, best_target, false);
     }
+
+    if (full_scan) {
+        sg_full_pull_up_calls++;
+        sg_full_pull_up_scanned += sample;
+        sg_full_pull_up_time += (double)(clock() - sg_begin) / CLOCKS_PER_SEC;
+    }
 }
 
 void pull_up_move_reduction() {
-    pull_up_move_reduction_from_pool(remaining_vertex);
+    pull_up_move_reduction_from_pool(remaining_vertex, pull_up_mode == 2);
 }
 
 void pull_up_move_reduction_aers_region() {
-    pull_up_move_reduction_from_pool(aers_region_vertices);
+    pull_up_move_reduction_from_pool(aers_region_vertices, pull_up_mode == 2);
 }
 
 void pull_up_move_reduction_test() {

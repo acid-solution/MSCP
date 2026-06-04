@@ -50,7 +50,7 @@ void perturbation(long pertub_bms, double conflict_weight);
 void pull_up_move_reduction();
 void push_down_move_reduction_aers_region();
 void pull_up_move_reduction_aers_region();
-void pull_up_move();
+void pull_up_move(bool full_scan = false);
 void pull_up_move_reduction_test();
 void localsearch_aers(int cutoff);
 void localsearch_reduction_aers(int cutoff);
@@ -122,6 +122,10 @@ long push_down_mode = 0;
 long pertubation_mode = 0;
 long big_pertub_mode = 0;
 long pull_up_mode = 0;
+long small_graph_opt_mode = 1;
+long small_graph_opt_active = 0;
+long small_graph_opt_diag = 0;
+long small_graph_opt_threshold = 5000;
 
 long multi_init_runs = 5;
 
@@ -208,3 +212,10 @@ static long pu_total_gain = 0;
 static long pu_nodes_moved = 0;
 static double pu_total_time = 0.0;
 // ==========================================
+
+long sg_full_push_down_calls = 0;
+long long sg_full_push_down_scanned = 0;
+double sg_full_push_down_time = 0.0;
+long sg_full_pull_up_calls = 0;
+long long sg_full_pull_up_scanned = 0;
+double sg_full_pull_up_time = 0.0;
