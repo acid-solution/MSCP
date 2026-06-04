@@ -45,8 +45,8 @@ int main(int argc, char* argv[]){
 	small_graph_opt_active = (small_graph_opt_mode != 0 && vertex_count < small_graph_opt_threshold) ? 1 : 0;
 	if (small_graph_opt_active) {
 		init_mode = 4;
-		push_down_mode = 2;
-		pull_up_mode = 2;
+		//push_down_mode = 2;
+		//pull_up_mode = 2;
 	}
 	begin_time = clock();
 	build();

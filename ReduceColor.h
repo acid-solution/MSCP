@@ -589,7 +589,7 @@ static long hesa_construct_candidate(vector<long>& candidate_color,
 }
 
 void init_color_hesa_mis(){
-    long hesa_init_candidates = small_graph_opt_active ? 1 : 20;
+    long hesa_init_candidates = 20;
     if (getenv("HESA_INIT_CANDIDATES") != NULL) {
         hesa_init_candidates = atol(getenv("HESA_INIT_CANDIDATES"));
         if (hesa_init_candidates < 1) hesa_init_candidates = 1;
